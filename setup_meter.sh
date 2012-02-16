@@ -217,6 +217,11 @@ if [ ! -z $APICREDS ]; then
         sudo apt-get install curl
       fi
 
+      if [ $DISTRO = "Debian" ]; then
+        sudo apt-get update > /dev/null
+        sudo apt-get install curl
+      fi
+
       if [ $DISTRO = "CentOS" ]; then
         if [ $MACHINE = "i686" ]; then
           sudo yum install curl.i686
@@ -253,6 +258,10 @@ if [ ! -z $APICREDS ]; then
   fi
 
   if [ $DISTRO = "Ubuntu" ]; then
+    SUPPORTED_PLATFORM=1
+  fi
+
+  if [ $DISTRO = "Debian" ]; then
     SUPPORTED_PLATFORM=1
   fi
 
@@ -344,7 +353,77 @@ if [ ! -z $APICREDS ]; then
       exit 1
     fi
   fi
+  
+  #
+  # Debian Install is just bastardazied Ubuntu install
+  #
 
+  if [ $DISTRO = "Debian" ]; then
+    test -f /usr/lib/apt/methods/https
+
+    if [ $? -gt 0 ];then
+      echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
+
+      if [ $DEPS = "true" ]; then
+        if [ $DISTRO = "Debian" ]; then
+          echo "Installing apt-transport-https ..."
+
+          sudo apt-get update > /dev/null
+          sudo apt-get install apt-transport-https
+        fi
+      else
+        echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+        exit 1
+      fi
+
+    fi
+
+    VERSION=`echo $PLATFORM | awk '{print $3}'`
+
+    MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+    MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+
+    if [ "$MAJOR_VERSION.$MINOR_VERSION" = "6.0" ]; then
+      echo "Detected $DISTRO $VERSION ..."
+      echo ""
+
+      METER_LOCATION=`create_meter $APIKEY $APIID`
+
+      if [ $? -gt 0 ]; then
+        echo "Error creating meter, $METER_LOCATION ..."
+        exit 1
+      fi
+
+      KEY_CERT=`setup_cert_key $APIKEY $METER_LOCATION`
+
+      if [ $? -eq 1 ]; then
+        echo "Error setting up cert and/or key ..."
+        echo $KEY_CERT
+        exit 1
+      fi
+
+      CERT_KEY_CHECK=`cert_key_check`
+
+      if [ $? -eq 1 ]; then
+        echo "Error setting up cert and/or key ..."
+        echo $CERT_KEY_CHECK
+        exit 1
+      fi
+
+      ec2_tag $APIKEY $METER_LOCATION
+
+      sudo apt-get update > /dev/null
+      curl -s https://$APT/boundary.list | sudo tee /etc/apt/sources.list.d/boundary.list > /dev/null
+      curl -s https://$APT/ubuntu/APT-GPG-KEY-Boundary | sudo apt-key add -
+      sudo apt-get update > /dev/null
+      sudo apt-get install bprobe
+    else
+      echo "Detected Debian but with unsupported ($MAJOR_VERSION.$MINOR_VERSION)"
+      echo "Boundary Meters have been tested with Debian 6.0. For additional Operating System support, please contact support@boundary.com"
+      exit 1
+    fi
+  fi
+  
   #
   # CentOS Install
   #
