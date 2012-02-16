@@ -294,12 +294,10 @@ if [ ! -z $APICREDS ]; then
       echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
 
       if [ $DEPS = "true" ]; then
-        if [ $DISTRO = "Ubuntu" ]; then
-          echo "Installing apt-transport-https ..."
+        echo "Installing apt-transport-https ..."
 
-          sudo apt-get update > /dev/null
-          sudo apt-get install apt-transport-https
-        fi
+        sudo apt-get update > /dev/null
+        sudo apt-get install apt-transport-https
       else
         echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
         exit 1
@@ -365,12 +363,10 @@ if [ ! -z $APICREDS ]; then
       echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
 
       if [ $DEPS = "true" ]; then
-        if [ $DISTRO = "Debian" ]; then
-          echo "Installing apt-transport-https ..."
+	echo "Installing apt-transport-https ..."
 
-          sudo apt-get update > /dev/null
-          sudo apt-get install apt-transport-https
-        fi
+        sudo apt-get update > /dev/null
+        sudo apt-get install apt-transport-https
       else
         echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
         exit 1
