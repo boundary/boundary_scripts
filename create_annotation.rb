@@ -59,7 +59,7 @@ def main
     annotation = create_annotation("#{API_URL}/#{ARGV[1]}/annotations", headers)
     puts "An annotation was created at #{annotation}"
   else
-    puts "./create_annotation.rb -i APIID -a APIKEY"
+    puts "./create_annotation.rb -i ORGID -a APIKEY"
   end
 end
 

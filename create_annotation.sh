@@ -20,7 +20,7 @@ APIHOST="api.boundary.com"
 APICREDS=
 
 function print_help() {
-  echo "./create_annotation.sh -i APIID -a APIKEY"
+  echo "./create_annotation.sh -i ORGID -a APIKEY"
   exit 0
 }
 

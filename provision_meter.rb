@@ -110,7 +110,7 @@ def main
     download_file(url, headers, "cert.pem")
     download_file(url, headers, "key.pem")
   else
-    puts "./provision_meter.rb -i APIID -a APIKEY"
+    puts "./provision_meter.rb -i ORGID -a APIKEY"
   end
 end
 
