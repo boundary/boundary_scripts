@@ -40,6 +40,9 @@ SUPPORTED_PLATFORM=0
 APT="apt.boundary.com"
 YUM="yum.boundary.com"
 
+APT_CMD="apt-get -q -y"
+YUM_CMD="yum -d0 -e0 -y"
+
 DEPS="false"
 
 trap "exit" INT TERM EXIT
@@ -213,17 +216,17 @@ if [ ! -z $APICREDS ]; then
       echo "Installing curl ..."
 
       if [ $DISTRO = "Ubuntu" ]; then
-        sudo apt-get update > /dev/null
-        sudo apt-get install curl
+        sudo $APT_CMD update > /dev/null
+        sudo $APT_CMD install curl
       fi
 
       if [ $DISTRO = "CentOS" ]; then
         if [ $MACHINE = "i686" ]; then
-          sudo yum install curl.i686
+          sudo $YUM_CMD install curl.i686
         fi
 
         if [ $MACHINE = "x86_64" ]; then
-          sudo yum install curl.x86_64
+          sudo $YUM_CMD install curl.x86_64
         fi
       fi
 
@@ -288,8 +291,8 @@ if [ ! -z $APICREDS ]; then
         if [ $DISTRO = "Ubuntu" ]; then
           echo "Installing apt-transport-https ..."
 
-          sudo apt-get update > /dev/null
-          sudo apt-get install apt-transport-https
+          sudo $APT_CMD update > /dev/null
+          sudo $APT_CMD install apt-transport-https
         fi
       else
         echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
@@ -333,11 +336,11 @@ if [ ! -z $APICREDS ]; then
 
       ec2_tag $APIKEY $METER_LOCATION
 
-      sudo apt-get update > /dev/null
+      sudo $APT_CMD update > /dev/null
       curl -s https://$APT/boundary.list | sudo tee /etc/apt/sources.list.d/boundary.list > /dev/null
       curl -s https://$APT/ubuntu/APT-GPG-KEY-Boundary | sudo apt-key add -
-      sudo apt-get update > /dev/null
-      sudo apt-get install bprobe
+      sudo $APT_CMD update > /dev/null
+      sudo $APT_CMD install bprobe
     else
       echo "Detected ubuntu but with an unsupported version ($MAJOR_VERSION.$MINOR_VERSION)"
       echo "Boundary Meters can only be installed on Ubuntu 10.04.  For additional Operating System support, please contact support@boundary.com"
@@ -386,7 +389,7 @@ if [ ! -z $APICREDS ]; then
 
       curl -s https://$YUM/boundary_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
       curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-      sudo yum install bprobe
+      sudo $YUM_CMD install bprobe
     else
       echo "Detected centos but with an unsupported version ($MAJOR_VERSION)"
       echo "Boundary Meters can only be installed on CentOS 5.x.  For additional Operating System support, please contact support@boundary.com"
