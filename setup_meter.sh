@@ -353,7 +353,14 @@ if [ ! -z $APICREDS ]; then
   #
 
   if [ $DISTRO = "CentOS" ]; then
+    
+    # Works for centos 5
     VERSION=`echo $PLATFORM | awk '{print $3}'`
+ 
+    # Hack for centos 6
+    if [ $VERSION = "release" ]; then
+      VERSION=`echo $PLATFORM | awk '{print $4}'`
+    fi
 
     MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
     MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
