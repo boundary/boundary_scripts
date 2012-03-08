@@ -358,8 +358,8 @@ if [ ! -z $APICREDS ]; then
     MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
     MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
-    if [ "$MAJOR_VERSION" = "5" ]; then
-      echo "Detected centos 5 ..."
+    if [ "$MAJOR_VERSION" = "5" ] || [ "$MAJOR_VERSION" = "6" ]; then
+      echo "Detected centos $MAJOR_VERSION ..."
       echo ""
 
       METER_LOCATION=`create_meter $APIKEY $APIID`
@@ -387,12 +387,12 @@ if [ ! -z $APICREDS ]; then
 
       ec2_tag $APIKEY $METER_LOCATION
 
-      curl -s https://$YUM/boundary_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
+      curl -s https://$YUM/boundary_centos"$MAJOR_VERSION"_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
       curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
       sudo $YUM_CMD install bprobe
     else
       echo "Detected centos but with an unsupported version ($MAJOR_VERSION)"
-      echo "Boundary Meters can only be installed on CentOS 5.x.  For additional Operating System support, please contact support@boundary.com"
+      echo "Boundary Meters can only be installed on CentOS 5.x and 6.x.  For additional Operating System support, please contact support@boundary.com"
       exit 1
     fi
   fi
