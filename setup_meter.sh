@@ -1,4 +1,4 @@
-###
+##
 ### Copyright 2011, Boundary
 ###
 ### Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,23 +16,24 @@
 
 #!/bin/bash
 
+# ARCHS=("i686" "x86_64")
+PLATFORMS=("Ubuntu" "Debian" "CentOS")
+
+# Put additional version numbers here.
+# These variables take the form ${platform}_VERSIONS, where $platform matches
+# the tags in $PLATFORMS
+Ubuntu_VERSIONS=("10.10" "11.04" "11.10")
+Debian_VERSIONS=("5" "6")
+CentOS_VERSIONS=("5" "6")
+
+# -----------------------------------------------------------------------------
+
+
 APIHOST="api.boundary.com"
 TARGET_DIR="/etc/bprobe"
 
 EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
 TAGS="instance-type placement/availability-zone security-groups"
-
-test -f /etc/issue
-
-if [ $? -eq 0 ]; then
-  PLATFORM=`cat /etc/issue | head -n 1`
-  DISTRO=`echo $PLATFORM | awk '{print $1}'`
-  MACHINE=`uname -m`
-else
-  PLATFORM="unknown"
-  DISTRO="unknown"
-  MACHINE=`uname -m`
-fi
 
 SUPPORTED_ARCH=0
 SUPPORTED_PLATFORM=0
@@ -40,12 +41,90 @@ SUPPORTED_PLATFORM=0
 APT="apt.boundary.com"
 YUM="yum.boundary.com"
 
-APT_CMD="apt-get -q -y"
+APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
 
 DEPS="false"
 
 trap "exit" INT TERM EXIT
+
+function print_supported_platforms() {
+    echo "Your platform is not supported. Supported platforms are:"
+    for d in ${PLATFORMS[*]}
+    do
+	echo -n $d:
+	foo="\${${d}_VERSIONS[*]}"
+	versions=`eval echo $foo`
+	for v in $versions
+	do
+	    echo -n " $v"
+	done
+	echo ""
+    done
+
+    exit 0
+}
+
+function check_distro_version() {
+    PLATFORM=$1
+    DISTRO=$2
+
+    TEMP="\${${DISTRO}_versions[*]}"
+    VERSIONS=`eval echo $TEMP`
+
+    if [ $DISTRO = "Ubuntu" ]; then
+	VERSION=`echo $PLATFORM | awk '{print $2}'`
+
+	MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+	MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+	PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
+
+	TEMP="\${${DISTRO}_VERSIONS[*]}"
+	VERSIONS=`eval echo $TEMP`
+	for v in $VERSIONS ; do
+	    if [ "$MAJOR_VERSION.$MINOR_VERSION" = "$v" ]; then
+		return 0
+	    fi
+	done
+
+    elif [ $DISTRO = "CentOS" ]; then
+	# Works for centos 5
+	VERSION=`echo $PLATFORM | awk '{print $3}'`
+ 
+        # Hack for centos 6
+	if [ $VERSION = "release" ]; then
+	    VERSION=`echo $PLATFORM | awk '{print $4}'`
+	fi
+
+	MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+	MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+
+	TEMP="\${${DISTRO}_VERSIONS[*]}"
+	VERSIONS=`eval echo $TEMP`
+	for v in $VERSIONS ; do
+	    if [ "$MAJOR_VERSION" = "$v" ]; then
+		return 0
+	    fi
+	done
+
+    elif [ $DISTRO = "Debian" ]; then
+	VERSION=`echo $PLATFORM | awk '{print $3}'`
+
+	MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+	MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+
+	TEMP="\${${DISTRO}_VERSIONS[*]}"
+	VERSIONS=`eval echo $TEMP`
+	for v in $VERSIONS ; do
+	    if [ "$MAJOR_VERSION" = "$v" ]; then
+		return 0
+	    fi
+	done
+    fi
+
+    echo "Detected $DISTRO but with an unsupported version ($MAJOR_VERSION.$MINOR_VERSION)"
+    return 1
+}
 
 function print_help() {
   echo "   ./meter_setup.sh [-d] -i ORGID:APIKEY"
@@ -90,6 +169,24 @@ function create_meter() {
       exit 1
     fi
   fi
+}
+
+function do_install() {
+    if [ "$DISTRO" = "Debian" ] || [ "$DISTRO" = "Ubuntu" ]; then
+	sudo $APT_CMD update > /dev/null
+	curl -s https://$APT/boundary.list | sudo tee /etc/apt/sources.list.d/boundary.list > /dev/null
+	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+	sudo $APT_CMD update > /dev/null
+	sudo $APT_CMD install bprobe
+
+	return $?
+    elif [ "$DISTRO" = "CentOS" ]; then
+	curl -s https://$YUM/boundary_centos"$MAJOR_VERSION"_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
+	curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
+	sudo $YUM_CMD install bprobe
+
+	return $?
+    fi
 }
 
 function setup_cert_key() {
@@ -196,213 +293,148 @@ function ec2_tag() {
   echo "done."
 }
 
+function pre_install_sanity() {
+    CURL=`which curl`
+
+    if [ $? -gt 0 ]; then
+	echo "The 'curl' command is either not installed or not on the PATH ..."
+
+	if [ $DEPS = "true" ]; then
+	    echo "Installing curl ..."
+
+	    if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+		sudo $APT_CMD update > /dev/null
+		sudo $APT_CMD install curl
+
+	    elif [ $DISTRO = "CentOS" ]; then
+		if [ $MACHINE = "i686" ]; then
+		    sudo $YUM_CMD install curl.i686
+		fi
+
+		if [ $MACHINE = "x86_64" ]; then
+		    sudo $YUM_CMD install curl.x86_64
+		fi
+	    fi
+	else
+	    echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+	    exit 1
+	fi
+    fi
+
+    if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+	test -f /usr/lib/apt/methods/https
+	if [ $? -gt 0 ];then
+	    echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
+
+	    if [ $DEPS = "true" ]; then
+		echo "Installing apt-transport-https ..."
+		sudo $APT_CMD update > /dev/null
+		sudo $APT_CMD install apt-transport-https
+	    else
+		echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+		exit 1
+	    fi
+	fi
+    fi
+}
+
+# Grab some system information
+test -f /etc/issue
+if [ $? -eq 0 ]; then
+    PLATFORM=`cat /etc/issue | head -n 1`
+    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    MACHINE=`uname -m`
+else
+    PLATFORM="unknown"
+    DISTRO="unknown"
+    MACHINE=`uname -m`
+fi
+
+
 while getopts "h di:" opts; do
-  case $opts in
-    h) print_help;;
-    d) DEPS="true";;
-    i) APICREDS="$OPTARG";;
-    [?]) print_help;;
-  esac
+    case $opts in
+	h) print_help;;
+	d) DEPS="true";;
+	i) APICREDS="$OPTARG";;
+	[?]) print_help;;
+    esac
 done
 
-if [ ! -z $APICREDS ]; then
+if [ -z $APICREDS ]; then
+    print_help
+fi
 
-  CURL=`which curl`
 
-  if [ $? -gt 0 ]; then
-    echo "The 'curl' command is either not installed or not on the PATH ..."
+APIID=`echo $APICREDS | awk -F: '{print $1}'`
+APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 
-    if [ $DEPS = "true" ]; then
-      echo "Installing curl ..."
-
-      if [ $DISTRO = "Ubuntu" ]; then
-        sudo $APT_CMD update > /dev/null
-        sudo $APT_CMD install curl
-      fi
-
-      if [ $DISTRO = "CentOS" ]; then
-        if [ $MACHINE = "i686" ]; then
-          sudo $YUM_CMD install curl.i686
-        fi
-
-        if [ $MACHINE = "x86_64" ]; then
-          sudo $YUM_CMD install curl.x86_64
-        fi
-      fi
-
-    else
-      echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
-      exit 1
-    fi
-  fi
-
-  APIID=`echo $APICREDS | awk -F: '{print $1}'`
-  APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
-
-  if [ $MACHINE = "i686" ]; then
+if [ $MACHINE = "i686" ]; then
     ARCH="32"
     SUPPORTED_ARCH=1
-  fi
+fi
 
-  if [ $MACHINE = "x86_64" ]; then
+if [ $MACHINE = "x86_64" ]; then
     ARCH="64"
     SUPPORTED_ARCH=1
-  fi
+fi
 
-  if [ $SUPPORTED_ARCH -eq 0 ]; then
+if [ $SUPPORTED_ARCH -eq 0 ]; then
     echo "Unsupported architecture ($MACHINE) ..."
-    echo "This is an unsupported platform for the Boundary Meter. Please contact support@boundary.com to request support for this architecture."
+    echo "This is an unsupported platform for the Boundary Meter."
+    echo "Please contact support@boundary.com to request support for this architecture."
     exit 1
-  fi
+fi
 
-  if [ $DISTRO = "Ubuntu" ]; then
-    SUPPORTED_PLATFORM=1
-  fi
+# Check the distribution
+for d in ${PLATFORMS[*]} ; do
+    if [ $DISTRO = $d ]; then
+	SUPPORTED_PLATFORM=1
+	break
+    fi
+done
+if [ $SUPPORTED_PLATFORM -eq 0 ]; then
+    print_supported_platforms
+fi
 
-  if [ $DISTRO = "CentOS" ]; then
-    SUPPORTED_PLATFORM=1
-  fi
+# Check the version number
+check_distro_version "$PLATFORM" $DISTRO
+if [ $? -ne 0 ]; then
+    print_supported_platforms
+fi
 
-  if [ $SUPPORTED_PLATFORM -eq 0 ]; then
-    echo "Unsupported OS ($DISTRO) ..."
-    echo "This is an unsupported OS for the Boundary Meter. Please contact support@boundary.com to request support for this operating system."
+echo "Detected $DISTRO $VERSION..."
+echo ""
+
+# At this point, we think we have a supported OS.
+pre_install_sanity $d $v
+
+METER_LOCATION=`create_meter $APIKEY $APIID`
+
+if [ $? -gt 0 ]; then
+    echo "Error creating meter, $METER_LOCATION ..."
     exit 1
-  fi
+fi
 
-  if [ "$HOSTNAME" == "localhost" ] || [ -z $HOSTNAME ]; then
-    echo "Hostname set to localhost or null, exiting."
-    echo "This script uses hostname as the meter name.  The hostname must be set to something other than localhost or null."
-    echo " "
-    echo "Set the hostname for this instance and re-run this script."
+KEY_CERT=`setup_cert_key $APIKEY $METER_LOCATION`
+if [ $? -eq 1 ]; then
+    echo "Error setting up cert and/or key ..."
+    echo $KEY_CERT
     exit 1
-  fi
+fi
 
-  #
-  # Ubuntu Install
-  #
+CERT_KEY_CHECK=`cert_key_check`
 
-  if [ $DISTRO = "Ubuntu" ]; then
-    test -f /usr/lib/apt/methods/https
+if [ $? -eq 1 ]; then
+    echo "Error setting up cert and/or key ..."
+    echo $CERT_KEY_CHECK
+    exit 1
+fi
 
-    if [ $? -gt 0 ];then
-      echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
+ec2_tag $APIKEY $METER_LOCATION
 
-      if [ $DEPS = "true" ]; then
-        if [ $DISTRO = "Ubuntu" ]; then
-          echo "Installing apt-transport-https ..."
+do_install
 
-          sudo $APT_CMD update > /dev/null
-          sudo $APT_CMD install apt-transport-https
-        fi
-      else
-        echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
-        exit 1
-      fi
-
-    fi
-
-    VERSION=`echo $PLATFORM | awk '{print $2}'`
-
-    MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-    MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-    PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
-
-    if [ "$MAJOR_VERSION.$MINOR_VERSION" = "10.04" ]; then
-      echo "Detected ubuntu 10.04 (lucid) ..."
-      echo ""
-
-      METER_LOCATION=`create_meter $APIKEY $APIID`
-
-      if [ $? -gt 0 ]; then
-        echo "Error creating meter, $METER_LOCATION ..."
-        exit 1
-      fi
-
-      KEY_CERT=`setup_cert_key $APIKEY $METER_LOCATION`
-
-      if [ $? -eq 1 ]; then
-        echo "Error setting up cert and/or key ..."
-        echo $KEY_CERT
-        exit 1
-      fi
-
-      CERT_KEY_CHECK=`cert_key_check`
-
-      if [ $? -eq 1 ]; then
-        echo "Error setting up cert and/or key ..."
-        echo $CERT_KEY_CHECK
-        exit 1
-      fi
-
-      ec2_tag $APIKEY $METER_LOCATION
-
-      sudo $APT_CMD update > /dev/null
-      curl -s https://$APT/boundary.list | sudo tee /etc/apt/sources.list.d/boundary.list > /dev/null
-      curl -s https://$APT/ubuntu/APT-GPG-KEY-Boundary | sudo apt-key add -
-      sudo $APT_CMD update > /dev/null
-      sudo $APT_CMD install bprobe
-    else
-      echo "Detected ubuntu but with an unsupported version ($MAJOR_VERSION.$MINOR_VERSION)"
-      echo "Boundary Meters can only be installed on Ubuntu 10.04.  For additional Operating System support, please contact support@boundary.com"
-      exit 1
-    fi
-  fi
-
-  #
-  # CentOS Install
-  #
-
-  if [ $DISTRO = "CentOS" ]; then
-    
-    # Works for centos 5
-    VERSION=`echo $PLATFORM | awk '{print $3}'`
- 
-    # Hack for centos 6
-    if [ $VERSION = "release" ]; then
-      VERSION=`echo $PLATFORM | awk '{print $4}'`
-    fi
-
-    MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-    MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-
-    if [ "$MAJOR_VERSION" = "5" ] || [ "$MAJOR_VERSION" = "6" ]; then
-      echo "Detected centos $MAJOR_VERSION ..."
-      echo ""
-
-      METER_LOCATION=`create_meter $APIKEY $APIID`
-
-      if [ $? -gt 0 ]; then
-        echo "Error creating meter, $METER_LOCATION ..."
-        exit 1
-      fi
-
-      KEY_CERT=`setup_cert_key $APIKEY $METER_LOCATION`
-
-      if [ $? -eq 1 ]; then
-        echo "Error setting up cert and/or key ..."
-        echo $KEY_CERT
-        exit 1
-      fi
-
-      CERT_KEY_CHECK=`cert_key_check`
-
-      if [ $? -eq 1 ]; then
-        echo "Error setting up cert and/or key ..."
-        echo $CERT_KEY_CHECK
-        exit 1
-      fi
-
-      ec2_tag $APIKEY $METER_LOCATION
-
-      curl -s https://$YUM/boundary_centos"$MAJOR_VERSION"_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
-      curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-      sudo $YUM_CMD install bprobe
-    else
-      echo "Detected centos but with an unsupported version ($MAJOR_VERSION)"
-      echo "Boundary Meters can only be installed on CentOS 5.x and 6.x.  For additional Operating System support, please contact support@boundary.com"
-      exit 1
-    fi
-  fi
-else
-  print_help
+if [ $? -ne 0 ]; then
+    echo "Part of the installation failed. Please contact support@boundary.com"
+    exit 1
 fi
