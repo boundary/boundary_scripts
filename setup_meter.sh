@@ -22,7 +22,7 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS")
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
-Ubuntu_VERSIONS=("10.10" "11.04" "11.10")
+Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10")
 Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 
