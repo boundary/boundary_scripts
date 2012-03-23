@@ -26,6 +26,20 @@ Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10")
 Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 
+# sed strips out obvious things in a version number that can't be used as 
+# a bash variable
+function map() { eval "$1"`echo $2 | sed 's/[\. -]//g'`='$3' ; }
+function get() { eval echo '${'"$1`echo $2 | sed 's/[\. -]//g'`"'#hash}' ; }
+
+# Map distributions to common strings.
+map Ubuntu 10.04 lucid
+map Ubuntu 10.10 maverick
+map Ubuntu 11.04 natty
+map Ubuntu 11.10 oneiric
+map Debian 5 lenny
+map Debian 6 squeeze
+
+# For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
 
 
@@ -128,8 +142,10 @@ function check_distro_version() {
 
 function print_help() {
   echo "   ./meter_setup.sh [-d] -i ORGID:APIKEY"
-  echo "      -i: Required input for authentication. The ORGID and APIKEY can be found in the Account Settings in the Boundary WebUI"
-  echo "      -d: Optional flag to install all dependencies, such as curl and apt-transport-https, required for Meter Install"
+  echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
+  echo "          in the Account Settings in the Boundary WebUI."
+  echo "      -d: Optional flag to install all dependencies, such as curl and"
+  echo "          apt-transport-https, required for Meter Install."
   exit 0
 }
 
@@ -172,16 +188,40 @@ function create_meter() {
 }
 
 function do_install() {
-    if [ "$DISTRO" = "Debian" ] || [ "$DISTRO" = "Ubuntu" ]; then
+    if [ "$DISTRO" = "Ubuntu" ]; then
 	sudo $APT_CMD update > /dev/null
-	curl -s https://$APT/boundary.list | sudo tee /etc/apt/sources.list.d/boundary.list > /dev/null
+	sudo sh -c "echo \"deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe\" > /etc/apt/sources.list.d/boundary.list"
+	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+	sudo $APT_CMD update > /dev/null
+	sudo $APT_CMD install bprobe
+
+	return $?
+    elif [ "$DISTRO" = "Debian" ]; then
+	sudo $APT_CMD update > /dev/null
+	sudo sh -c "echo \"deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main\" > /etc/apt/sources.list.d/boundary.list"
 	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
 	sudo $APT_CMD update > /dev/null
 	sudo $APT_CMD install bprobe
 
 	return $?
     elif [ "$DISTRO" = "CentOS" ]; then
-	curl -s https://$YUM/boundary_centos"$MAJOR_VERSION"_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
+	GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
+	if [ $MACHINE = "i686" ]; then
+	    ARCH_STR="i386/"
+	elif [ $MACHINE = "x86_64" ]; then
+	    ARCH_STR="x86_64/"
+	fi
+
+	sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
+[boundary]
+name=boundary
+baseurl=http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR
+gpgcheck=1
+gpgkey=file://$GPG_KEY_LOCATION
+enabled=1
+EOF"
+
+	#curl -s https://$YUM/boundary_centos"$MAJOR_VERSION"_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
 	curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
 	sudo $YUM_CMD install bprobe
 
@@ -294,8 +334,14 @@ function ec2_tag() {
 }
 
 function pre_install_sanity() {
-    CURL=`which curl`
+    SUDO=`which sudo`
+    if [ $? -ne 0 ]; then
+	echo "This script requires that sudo be installed and configured for your user."
+	echo "Please install sudo. For assistance, support@boundary.com"
+	exit 1
+    fi
 
+    CURL=`which curl`
     if [ $? -gt 0 ]; then
 	echo "The 'curl' command is either not installed or not on the PATH ..."
 
@@ -412,12 +458,14 @@ METER_LOCATION=`create_meter $APIKEY $APIID`
 
 if [ $? -gt 0 ]; then
     echo "Error creating meter, $METER_LOCATION ..."
+    echo "Please contact support@boundary.com"
     exit 1
 fi
 
 KEY_CERT=`setup_cert_key $APIKEY $METER_LOCATION`
 if [ $? -eq 1 ]; then
     echo "Error setting up cert and/or key ..."
+    echo "Please contact support@boundary.com"
     echo $KEY_CERT
     exit 1
 fi
@@ -426,6 +474,7 @@ CERT_KEY_CHECK=`cert_key_check`
 
 if [ $? -eq 1 ]; then
     echo "Error setting up cert and/or key ..."
+    echo "Please contact support@boundary.com"
     echo $CERT_KEY_CHECK
     exit 1
 fi
@@ -435,6 +484,7 @@ ec2_tag $APIKEY $METER_LOCATION
 do_install
 
 if [ $? -ne 0 ]; then
-    echo "Part of the installation failed. Please contact support@boundary.com"
+    echo "Meter installation failed."
+    echo "Please contact support@boundary.com"
     exit 1
 fi
