@@ -175,13 +175,15 @@ function create_meter() {
 
   if [ "$STATUS" = "401" ]; then
     echo "Authentication error, bad Org ID or API key (http status $STATUS)."
-    echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY can be found in the Account Settings in the Boundary WebUI"
+    echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY"
+    echo "can be found in the Account Settings in the Boundary WebUI."
     exit 1
   else
     if [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ]; then
       echo $RESULT | awk '{print $2}'
     else
-      echo "An Error occurred during the meter creation (http status $STATUS).  Please contact support at support@boundary.com."
+      echo "An Error occurred during the meter creation (http status $STATUS)."
+      echo "Please contact support at support@boundary.com."
       exit 1
     fi
   fi
@@ -190,19 +192,35 @@ function create_meter() {
 function do_install() {
     if [ "$DISTRO" = "Ubuntu" ]; then
 	sudo $APT_CMD update > /dev/null
-	sudo sh -c "echo \"deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe\" > /etc/apt/sources.list.d/boundary.list"
+
+	APT_STRING="deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+	echo "Adding repository $APT_STRING"
+	sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+
 	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+	if [ $? -gt 0 ]; then
+	    echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+	    exit 1
+	fi
+
 	sudo $APT_CMD update > /dev/null
 	sudo $APT_CMD install bprobe
-
 	return $?
     elif [ "$DISTRO" = "Debian" ]; then
 	sudo $APT_CMD update > /dev/null
-	sudo sh -c "echo \"deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main\" > /etc/apt/sources.list.d/boundary.list"
+
+	APT_STRING="deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main"
+	echo "Adding repository $APT_STRING"
+	sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+
 	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+	if [ $? -gt 0 ]; then
+	    echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+	    exit 1
+	fi
+
 	sudo $APT_CMD update > /dev/null
 	sudo $APT_CMD install bprobe
-
 	return $?
     elif [ "$DISTRO" = "CentOS" ]; then
 	GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
@@ -211,6 +229,8 @@ function do_install() {
 	elif [ $MACHINE = "x86_64" ]; then
 	    ARCH_STR="x86_64/"
 	fi
+
+	echo "Adding repository http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR"
 
 	sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
 [boundary]
@@ -221,10 +241,13 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-	#curl -s https://$YUM/boundary_centos"$MAJOR_VERSION"_"$ARCH"bit.repo | sudo tee /etc/yum.repos.d/boundary.repo > /dev/null
 	curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-	sudo $YUM_CMD install bprobe
+	if [ $? -gt 0 ]; then
+	    echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+	    exit 1
+	fi
 
+	sudo $YUM_CMD install bprobe
 	return $?
     fi
 }
@@ -484,7 +507,11 @@ ec2_tag $APIKEY $METER_LOCATION
 do_install
 
 if [ $? -ne 0 ]; then
-    echo "Meter installation failed."
-    echo "Please contact support@boundary.com"
+    echo "I added the correct repositories, but the meter installation failed."
+    echo "Please contact support@boundary.com about this problem."
     exit 1
 fi
+
+
+echo ""
+echo "The meter has been installed successfully!"
