@@ -157,27 +157,41 @@ function create_meter() {
     | tr -d "\r" \
     | awk '{split($0,a," "); print a[2]}'`
 
-  STATUS=`echo $RESULT | awk '{print $1}'`
-
   exit_status=$?
 
+  # an exit status of 1 indicates an unsupported protocol. (e.g.,
+  # https hasn't been baked in.)
+  if [ "$exit_status" -eq "1" ]; then
+    echo "Your local version of curl has not been built with HTTPS support: `which curl`"
+    exit 1
+
   # if the exit code is 7, that means curl couldnt connect so we can bail
-  if [ "$exit_status" -eq "7" ]; then
+  elif [ "$exit_status" -eq "7" ]; then
     echo "Could not connect to create meter"
     exit 1
-  fi
 
   # it appears that an exit code of 28 is also a can't connect error
-  if [ "$exit_status" -eq "28" ]; then
+  elif [ "$exit_status" -eq "28" ]; then
     echo "Could not connect to create meter"
+    exit 1
+
+  elif [ "$exit_status" -ne "0" ]; then
+    echo "Error connecting to $APIHOST; status $exit_status."
     exit 1
   fi
 
-  if [ "$STATUS" = "401" ]; then
+  STATUS=`echo $RESULT | awk '{print $1}'`
+
+  if [ "$STATUS" = "" ]; then
+    echo "Unknown error communicating with $APIHOST."
+    exit 1
+
+  elif [ "$STATUS" = "401" ]; then
     echo "Authentication error, bad Org ID or API key (http status $STATUS)."
     echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY"
     echo "can be found in the Account Settings in the Boundary WebUI."
     exit 1
+
   else
     if [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ]; then
       echo $RESULT | awk '{print $2}'
@@ -480,7 +494,8 @@ pre_install_sanity $d $v
 METER_LOCATION=`create_meter $APIKEY $APIID`
 
 if [ $? -gt 0 ]; then
-    echo "Error creating meter, $METER_LOCATION ..."
+    echo "Error creating meter:"
+    echo "$METER_LOCATION"
     echo "Please contact support@boundary.com"
     exit 1
 fi
