@@ -22,7 +22,7 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS")
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
-Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10")
+Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04")
 Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 
@@ -36,12 +36,14 @@ map Ubuntu 10.04 lucid
 map Ubuntu 10.10 maverick
 map Ubuntu 11.04 natty
 map Ubuntu 11.10 oneiric
+map Ubuntu 12.04 precise
 map Debian 5 lenny
 map Debian 6 squeeze
 
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
 
+CURL="`which curl` --ciphers MEDIUM"
 
 APIHOST="api.boundary.com"
 TARGET_DIR="/etc/bprobe"
@@ -150,7 +152,8 @@ function print_help() {
 }
 
 function create_meter() {
-  RESULT=`curl --connect-timeout 5 -i -s -X POST \
+
+  RESULT=`$CURL --connect-timeout 5 -i -s -X POST \
     -H "Content-Type: application/json" \
     -d "{\"name\": \"$HOSTNAME\"}" -u "$1:" \
     https://$APIHOST/$2/meters \
@@ -211,7 +214,7 @@ function do_install() {
 	echo "Adding repository $APT_STRING"
 	sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+	$CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
 	if [ $? -gt 0 ]; then
 	    echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
 	    exit 1
@@ -227,7 +230,7 @@ function do_install() {
 	echo "Adding repository $APT_STRING"
 	sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-	curl -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+	$CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
 	if [ $? -gt 0 ]; then
 	    echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
 	    exit 1
@@ -255,7 +258,7 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-	curl -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
+	$CURL -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
 	if [ $? -gt 0 ]; then
 	    echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
 	    exit 1
@@ -281,7 +284,7 @@ function setup_cert_key() {
   if [ $? -eq 1 ]; then
     echo "Key file is missing, attempting to download ..."
     echo "Downloading meter key for $2"
-    sudo curl -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
+    $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
 
     if [ $? -gt 0 ]; then
       echo "Error downloading key ..."
@@ -296,7 +299,7 @@ function setup_cert_key() {
   if [ $? -eq 1 ]; then
     echo "Cert file is missing, attempting to download ..."
     echo "Downloading meter certificate for $2"
-    sudo curl -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
+    $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
 
     if [ $? -gt 0 ]; then
       echo "Error downloading certificate ..."
@@ -326,7 +329,7 @@ function cert_key_check() {
 function ec2_tag() {
   trap "exit" INT TERM EXIT
 
-  EC2=`curl -s --connect-timeout 5 "$EC2_INTERNAL"`
+  EC2=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL"`
   exit_code=$?
 
   if [ "$exit_code" -eq "0" ]; then
@@ -339,7 +342,7 @@ function ec2_tag() {
     local AN_TAG
     local exit_code
 
-    AN_TAG=`curl -s --connect-timeout 5 "$EC2_INTERNAL/$tag"`
+    AN_TAG=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL/$tag"`
     exit_code=$?
 
     # if the exit code is 7, that means curl couldnt connect so we can bail
@@ -362,11 +365,11 @@ function ec2_tag() {
 
     for an_tag in $AN_TAG; do
       # create the tag
-      curl -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/$an_tag"
+      $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/$an_tag"
     done
   done
 
-  curl -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/ec2"
+  $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/ec2"
   echo "done."
 }
 
@@ -378,7 +381,7 @@ function pre_install_sanity() {
 	exit 1
     fi
 
-    CURL=`which curl`
+    which curl > /dev/null
     if [ $? -gt 0 ]; then
 	echo "The 'curl' command is either not installed or not on the PATH ..."
 
