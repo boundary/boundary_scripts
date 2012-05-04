@@ -43,7 +43,7 @@ map Debian 6 squeeze
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
 
-CURL="`which curl` --ciphers MEDIUM"
+CURL="`which curl` --ciphers MEDIUM --sslv3"
 
 APIHOST="api.boundary.com"
 TARGET_DIR="/etc/bprobe"
