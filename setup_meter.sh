@@ -43,8 +43,6 @@ map Debian 6 squeeze
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
 
-CURL="`which curl` --ciphers MEDIUM --sslv3"
-
 APIHOST="api.boundary.com"
 TARGET_DIR="/etc/bprobe"
 
@@ -406,6 +404,7 @@ function pre_install_sanity() {
 	    exit 1
 	fi
     fi
+    CURL="`which curl` --ciphers MEDIUM --sslv3"
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
 	test -f /usr/lib/apt/methods/https
