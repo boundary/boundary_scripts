@@ -404,7 +404,7 @@ function pre_install_sanity() {
 	    exit 1
 	fi
     fi
-    CURL="`which curl` --ciphers MEDIUM --sslv3"
+    CURL="`which curl` --sslv3"
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
 	test -f /usr/lib/apt/methods/https
