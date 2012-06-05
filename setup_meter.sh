@@ -26,7 +26,7 @@ Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04")
 Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 
-# sed strips out obvious things in a version number that can't be used as 
+# sed strips out obvious things in a version number that can't be used as
 # a bash variable
 function map() { eval "$1"`echo $2 | sed 's/[\. -]//g'`='$3' ; }
 function get() { eval echo '${'"$1`echo $2 | sed 's/[\. -]//g'`"'#hash}' ; }
@@ -104,7 +104,7 @@ function check_distro_version() {
     elif [ $DISTRO = "CentOS" ]; then
 	# Works for centos 5
 	VERSION=`echo $PLATFORM | awk '{print $3}'`
- 
+
         # Hack for centos 6
 	if [ $VERSION = "release" ]; then
 	    VERSION=`echo $PLATFORM | awk '{print $4}'`
@@ -331,7 +331,15 @@ function ec2_tag() {
   exit_code=$?
 
   if [ "$exit_code" -eq "0" ]; then
-    echo -n "Auto generating ec2 tags for this meter...."
+    # check to see if we *really* are on EC2
+    $CURL -is --connect-timeout 5 "$EC2_INTERNAL" | grep 'Server: EC2ws' > /dev/null
+    exit_code=$?
+
+    if [ "$exit_code" -eq "0" ]; then
+      echo -n "Auto generating ec2 tags for this meter...."
+    else
+      return 0
+    fi
   else
     return 0
   fi
