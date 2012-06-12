@@ -141,7 +141,7 @@ function check_distro_version() {
 }
 
 function print_help() {
-  echo "   ./meter_setup.sh [-d] -i ORGID:APIKEY"
+  echo "   $0 [-d] -i ORGID:APIKEY"
   echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
   echo "          in the Account Settings in the Boundary WebUI."
   echo "      -d: Optional flag to install all dependencies, such as curl and"
@@ -414,7 +414,7 @@ function pre_install_sanity() {
     fi
       fi
   else
-      echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+      echo "To automatically install required components for Meter Install, rerun $0 with -d flag."
       exit 1
   fi
     fi
@@ -430,7 +430,7 @@ function pre_install_sanity() {
     sudo $APT_CMD update > /dev/null
     sudo $APT_CMD install apt-transport-https
       else
-    echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+    echo "To automatically install required components for Meter Install, rerun $0 with -d flag."
     exit 1
       fi
   fi
