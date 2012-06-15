@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ##
 ### Copyright 2011, Boundary
 ###
@@ -13,8 +15,6 @@
 ### See the License for the specific language governing permissions and
 ### limitations under the License.
 ###
-
-#!/bin/bash
 
 # ARCHS=("i686" "x86_64")
 PLATFORMS=("Ubuntu" "Debian" "CentOS")
@@ -191,6 +191,12 @@ function create_meter() {
     echo "Authentication error, bad Org ID or API key (http status $STATUS)."
     echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY"
     echo "can be found in the Account Settings in the Boundary WebUI."
+    exit 1
+
+  elif [ "$STATUS" = "403" ]; then
+    echo "Forbidden error (http status $STATUS)."
+    echo "Verify that you have not exceeded your meter limit."
+    echo "If you haven't, please contact support at support@boundary.com."
     exit 1
 
   else
