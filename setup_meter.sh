@@ -66,14 +66,14 @@ function print_supported_platforms() {
     echo "Your platform is not supported. Supported platforms are:"
     for d in ${PLATFORMS[*]}
     do
-	echo -n $d:
-	foo="\${${d}_VERSIONS[*]}"
-	versions=`eval echo $foo`
-	for v in $versions
-	do
-	    echo -n " $v"
-	done
-	echo ""
+        echo -n $d:
+        foo="\${${d}_VERSIONS[*]}"
+        versions=`eval echo $foo`
+        for v in $versions
+        do
+            echo -n " $v"
+        done
+        echo ""
     done
 
     exit 0
@@ -87,53 +87,53 @@ function check_distro_version() {
     VERSIONS=`eval echo $TEMP`
 
     if [ $DISTRO = "Ubuntu" ]; then
-	VERSION=`echo $PLATFORM | awk '{print $2}'`
+        VERSION=`echo $PLATFORM | awk '{print $2}'`
 
-	MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-	MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-	PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
+        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+        PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
 
-	TEMP="\${${DISTRO}_VERSIONS[*]}"
-	VERSIONS=`eval echo $TEMP`
-	for v in $VERSIONS ; do
-	    if [ "$MAJOR_VERSION.$MINOR_VERSION" = "$v" ]; then
-		return 0
-	    fi
-	done
+        TEMP="\${${DISTRO}_VERSIONS[*]}"
+        VERSIONS=`eval echo $TEMP`
+        for v in $VERSIONS ; do
+            if [ "$MAJOR_VERSION.$MINOR_VERSION" = "$v" ]; then
+                return 0
+            fi
+        done
 
     elif [ $DISTRO = "CentOS" ]; then
-	# Works for centos 5
-	VERSION=`echo $PLATFORM | awk '{print $3}'`
+        # Works for centos 5
+        VERSION=`echo $PLATFORM | awk '{print $3}'`
 
         # Hack for centos 6
-	if [ $VERSION = "release" ]; then
-	    VERSION=`echo $PLATFORM | awk '{print $4}'`
-	fi
+        if [ $VERSION = "release" ]; then
+            VERSION=`echo $PLATFORM | awk '{print $4}'`
+        fi
 
-	MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-	MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
-	TEMP="\${${DISTRO}_VERSIONS[*]}"
-	VERSIONS=`eval echo $TEMP`
-	for v in $VERSIONS ; do
-	    if [ "$MAJOR_VERSION" = "$v" ]; then
-		return 0
-	    fi
-	done
+        TEMP="\${${DISTRO}_VERSIONS[*]}"
+        VERSIONS=`eval echo $TEMP`
+        for v in $VERSIONS ; do
+            if [ "$MAJOR_VERSION" = "$v" ]; then
+                return 0
+            fi
+        done
 
     elif [ $DISTRO = "Debian" ]; then
-	VERSION=`echo $PLATFORM | awk '{print $3}'`
+        VERSION=`echo $PLATFORM | awk '{print $3}'`
 
-	MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-	MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
-	TEMP="\${${DISTRO}_VERSIONS[*]}"
-	VERSIONS=`eval echo $TEMP`
-	for v in $VERSIONS ; do
-	    if [ "$MAJOR_VERSION" = "$v" ]; then
-		return 0
-	    fi
-	done
+        TEMP="\${${DISTRO}_VERSIONS[*]}"
+        VERSIONS=`eval echo $TEMP`
+        for v in $VERSIONS ; do
+            if [ "$MAJOR_VERSION" = "$v" ]; then
+                return 0
+            fi
+        done
     fi
 
     echo "Detected $DISTRO but with an unsupported version ($MAJOR_VERSION.$MINOR_VERSION)"
@@ -141,119 +141,119 @@ function check_distro_version() {
 }
 
 function print_help() {
-  echo "   ./meter_setup.sh [-d] -i ORGID:APIKEY"
-  echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
-  echo "          in the Account Settings in the Boundary WebUI."
-  echo "      -d: Optional flag to install all dependencies, such as curl and"
-  echo "          apt-transport-https, required for Meter Install."
-  exit 0
+    echo "   ./meter_setup.sh [-d] -i ORGID:APIKEY"
+    echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
+    echo "          in the Account Settings in the Boundary WebUI."
+    echo "      -d: Optional flag to install all dependencies, such as curl and"
+    echo "          apt-transport-https, required for Meter Install."
+    exit 0
 }
 
 function create_meter() {
 
-  RESULT=`$CURL --connect-timeout 5 -i -s -X POST \
-    -H "Content-Type: application/json" \
-    -d "{\"name\": \"$HOSTNAME\"}" -u "$1:" \
-    https://$APIHOST/$2/meters \
-    | tr -d "\r" \
-    | awk '{split($0,a," "); print a[2]}'`
+    RESULT=`$CURL --connect-timeout 5 -i -s -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"name\": \"$HOSTNAME\"}" -u "$1:" \
+        https://$APIHOST/$2/meters \
+        | tr -d "\r" \
+        | awk '{split($0,a," "); print a[2]}'`
 
-  exit_status=$?
+    exit_status=$?
 
-  # an exit status of 1 indicates an unsupported protocol. (e.g.,
-  # https hasn't been baked in.)
-  if [ "$exit_status" -eq "1" ]; then
-    echo "Your local version of curl has not been built with HTTPS support: `which curl`"
-    exit 1
+    # an exit status of 1 indicates an unsupported protocol. (e.g.,
+    # https hasn't been baked in.)
+    if [ "$exit_status" -eq "1" ]; then
+        echo "Your local version of curl has not been built with HTTPS support: `which curl`"
+        exit 1
 
-  # if the exit code is 7, that means curl couldnt connect so we can bail
-  elif [ "$exit_status" -eq "7" ]; then
-    echo "Could not connect to create meter"
-    exit 1
+    # if the exit code is 7, that means curl couldnt connect so we can bail
+    elif [ "$exit_status" -eq "7" ]; then
+        echo "Could not connect to create meter"
+        exit 1
 
-  # it appears that an exit code of 28 is also a can't connect error
-  elif [ "$exit_status" -eq "28" ]; then
-    echo "Could not connect to create meter"
-    exit 1
+    # it appears that an exit code of 28 is also a can't connect error
+    elif [ "$exit_status" -eq "28" ]; then
+        echo "Could not connect to create meter"
+        exit 1
 
-  elif [ "$exit_status" -ne "0" ]; then
-    echo "Error connecting to $APIHOST; status $exit_status."
-    exit 1
-  fi
-
-  STATUS=`echo $RESULT | awk '{print $1}'`
-
-  if [ "$STATUS" = "" ]; then
-    echo "Unknown error communicating with $APIHOST."
-    exit 1
-
-  elif [ "$STATUS" = "401" ]; then
-    echo "Authentication error, bad Org ID or API key (http status $STATUS)."
-    echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY"
-    echo "can be found in the Account Settings in the Boundary WebUI."
-    exit 1
-
-  elif [ "$STATUS" = "403" ]; then
-    echo "Forbidden error (http status $STATUS)."
-    echo "Verify that you have not exceeded your meter limit."
-    echo "If you haven't, please contact support at support@boundary.com."
-    exit 1
-
-  else
-    if [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ]; then
-      echo $RESULT | awk '{print $2}'
-    else
-      echo "An Error occurred during the meter creation (http status $STATUS)."
-      echo "Please contact support at support@boundary.com."
-      exit 1
+    elif [ "$exit_status" -ne "0" ]; then
+        echo "Error connecting to $APIHOST; status $exit_status."
+        exit 1
     fi
-  fi
+
+    STATUS=`echo $RESULT | awk '{print $1}'`
+
+    if [ "$STATUS" = "" ]; then
+        echo "Unknown error communicating with $APIHOST."
+        exit 1
+
+    elif [ "$STATUS" = "401" ]; then
+        echo "Authentication error, bad Org ID or API key (http status $STATUS)."
+        echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY"
+        echo "can be found in the Account Settings in the Boundary WebUI."
+        exit 1
+
+    elif [ "$STATUS" = "403" ]; then
+        echo "Forbidden error (http status $STATUS)."
+        echo "Verify that you have not exceeded your meter limit."
+        echo "If you haven't, please contact support at support@boundary.com."
+        exit 1
+
+    else
+        if [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ]; then
+            echo $RESULT | awk '{print $2}'
+        else
+            echo "An Error occurred during the meter creation (http status $STATUS)."
+            echo "Please contact support at support@boundary.com."
+            exit 1
+        fi
+    fi
 }
 
 function do_install() {
     if [ "$DISTRO" = "Ubuntu" ]; then
-	sudo $APT_CMD update > /dev/null
+        sudo $APT_CMD update > /dev/null
 
-	APT_STRING="deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
-	echo "Adding repository $APT_STRING"
-	sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+        APT_STRING="deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+        echo "Adding repository $APT_STRING"
+        sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-	$CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
-	if [ $? -gt 0 ]; then
-	    echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
-	    exit 1
-	fi
+        $CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+            exit 1
+        fi
 
-	sudo $APT_CMD update > /dev/null
-	sudo $APT_CMD install bprobe
-	return $?
+        sudo $APT_CMD update > /dev/null
+        sudo $APT_CMD install bprobe
+        return $?
     elif [ "$DISTRO" = "Debian" ]; then
-	sudo $APT_CMD update > /dev/null
+        sudo $APT_CMD update > /dev/null
 
-	APT_STRING="deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main"
-	echo "Adding repository $APT_STRING"
-	sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+        APT_STRING="deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main"
+        echo "Adding repository $APT_STRING"
+        sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-	$CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
-	if [ $? -gt 0 ]; then
-	    echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
-	    exit 1
-	fi
+        $CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+            exit 1
+        fi
 
-	sudo $APT_CMD update > /dev/null
-	sudo $APT_CMD install bprobe
-	return $?
+        sudo $APT_CMD update > /dev/null
+        sudo $APT_CMD install bprobe
+        return $?
     elif [ "$DISTRO" = "CentOS" ]; then
-	GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
-	if [ $MACHINE = "i686" ]; then
-	    ARCH_STR="i386/"
-	elif [ $MACHINE = "x86_64" ]; then
-	    ARCH_STR="x86_64/"
-	fi
+        GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
+        if [ $MACHINE = "i686" ]; then
+            ARCH_STR="i386/"
+        elif [ $MACHINE = "x86_64" ]; then
+            ARCH_STR="x86_64/"
+        fi
 
-	echo "Adding repository http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR"
+        echo "Adding repository http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR"
 
-	sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
+        sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
 [boundary]
 name=boundary
 baseurl=http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR
@@ -262,178 +262,178 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-	$CURL -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-	if [ $? -gt 0 ]; then
-	    echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
-	    exit 1
-	fi
+        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+            exit 1
+        fi
 
-	sudo $YUM_CMD install bprobe
-	return $?
+        sudo $YUM_CMD install bprobe
+        return $?
     fi
 }
 
 function setup_cert_key() {
-  trap "exit" INT TERM EXIT
+    trap "exit" INT TERM EXIT
 
-  test -d $TARGET_DIR
+    test -d $TARGET_DIR
 
-  if [ $? -eq 1 ]; then
-    echo "Creating meter config directory ($TARGET_DIR) ..."
-    sudo mkdir $TARGET_DIR
-  fi
-
-  test -f $TARGET_DIR/key.pem
-
-  if [ $? -eq 1 ]; then
-    echo "Key file is missing, attempting to download ..."
-    echo "Downloading meter key for $2"
-    $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
-
-    if [ $? -gt 0 ]; then
-      echo "Error downloading key ..."
-      exit 1
+    if [ $? -eq 1 ]; then
+        echo "Creating meter config directory ($TARGET_DIR) ..."
+        sudo mkdir $TARGET_DIR
     fi
 
-    sudo chmod 600 $TARGET_DIR/key.pem
-  fi
+    test -f $TARGET_DIR/key.pem
 
-  test -f $TARGET_DIR/cert.pem
+    if [ $? -eq 1 ]; then
+        echo "Key file is missing, attempting to download ..."
+        echo "Downloading meter key for $2"
+        $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
 
-  if [ $? -eq 1 ]; then
-    echo "Cert file is missing, attempting to download ..."
-    echo "Downloading meter certificate for $2"
-    $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
+        if [ $? -gt 0 ]; then
+            echo "Error downloading key ..."
+            exit 1
+        fi
 
-    if [ $? -gt 0 ]; then
-      echo "Error downloading certificate ..."
-      exit 1
+        sudo chmod 600 $TARGET_DIR/key.pem
     fi
 
-    sudo chmod 600 $TARGET_DIR/cert.pem
-  fi
+    test -f $TARGET_DIR/cert.pem
+
+    if [ $? -eq 1 ]; then
+        echo "Cert file is missing, attempting to download ..."
+        echo "Downloading meter certificate for $2"
+        $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
+
+        if [ $? -gt 0 ]; then
+            echo "Error downloading certificate ..."
+            exit 1
+        fi
+
+        sudo chmod 600 $TARGET_DIR/cert.pem
+    fi
 }
 
 function cert_key_check() {
-  SIZE=`du $TARGET_DIR/cert.pem | awk '{print $1}'`
+    SIZE=`du $TARGET_DIR/cert.pem | awk '{print $1}'`
 
-  if [ $SIZE -lt 1 ]; then
-    echo "Error downloading certificate (file size 0) ..."
-    exit 1
-  fi
+    if [ $SIZE -lt 1 ]; then
+        echo "Error downloading certificate (file size 0) ..."
+        exit 1
+    fi
 
-  SIZE=`du $TARGET_DIR/key.pem | awk '{print $1}'`
+    SIZE=`du $TARGET_DIR/key.pem | awk '{print $1}'`
 
-  if [ $SIZE -lt 1 ]; then
-    echo "Error downloading key (file size 0) ..."
-    exit 1
-  fi
+    if [ $SIZE -lt 1 ]; then
+        echo "Error downloading key (file size 0) ..."
+        exit 1
+    fi
 }
 
 function ec2_tag() {
-  trap "exit" INT TERM EXIT
+    trap "exit" INT TERM EXIT
 
-  EC2=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL"`
-  exit_code=$?
-
-  if [ "$exit_code" -eq "0" ]; then
-    # check to see if we *really* are on EC2
-    $CURL -is --connect-timeout 5 "$EC2_INTERNAL" | grep 'Server: EC2ws' > /dev/null
+    EC2=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL"`
     exit_code=$?
 
     if [ "$exit_code" -eq "0" ]; then
-      echo -n "Auto generating ec2 tags for this meter...."
+        # check to see if we *really* are on EC2
+        $CURL -is --connect-timeout 5 "$EC2_INTERNAL" | grep 'Server: EC2ws' > /dev/null
+        exit_code=$?
+
+        if [ "$exit_code" -eq "0" ]; then
+            echo -n "Auto generating ec2 tags for this meter...."
+        else
+            return 0
+        fi
     else
-      return 0
-    fi
-  else
-    return 0
-  fi
-
-  for tag in $TAGS; do
-    local AN_TAG
-    local exit_code
-
-    AN_TAG=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL/$tag"`
-    exit_code=$?
-
-    # if the exit code is 7, that means curl couldnt connect so we can bail
-    # since we probably are not on ec2.
-    if [ "$exit_code" -eq "7" ]; then
-      # do nothing
-      return 0
+        return 0
     fi
 
-    # it appears that an exit code of 28 is also a can't connect error
-    if [ "$exit_code" -eq "28" ]; then
-       # do nothing
-      return 0
-    fi
+    for tag in $TAGS; do
+        local AN_TAG
+        local exit_code
+
+        AN_TAG=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL/$tag"`
+        exit_code=$?
+
+        # if the exit code is 7, that means curl couldnt connect so we can bail
+        # since we probably are not on ec2.
+        if [ "$exit_code" -eq "7" ]; then
+            # do nothing
+            return 0
+        fi
+
+        # it appears that an exit code of 28 is also a can't connect error
+        if [ "$exit_code" -eq "28" ]; then
+            # do nothing
+            return 0
+        fi
 
     # otherwise, maybe there was as timeout or something, skip that tag.
-    if [ "$exit_code" -ne "0" ]; then
-      continue
-    fi
+        if [ "$exit_code" -ne "0" ]; then
+            continue
+        fi
 
-    for an_tag in $AN_TAG; do
-      # create the tag
-      $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/$an_tag"
+        for an_tag in $AN_TAG; do
+            # create the tag
+            $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/$an_tag"
+        done
     done
-  done
 
-  $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/ec2"
-  echo "done."
+    $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/ec2"
+    echo "done."
 }
 
 function pre_install_sanity() {
     SUDO=`which sudo`
     if [ $? -ne 0 ]; then
-	echo "This script requires that sudo be installed and configured for your user."
-	echo "Please install sudo. For assistance, support@boundary.com"
-	exit 1
+        echo "This script requires that sudo be installed and configured for your user."
+        echo "Please install sudo. For assistance, support@boundary.com"
+        exit 1
     fi
 
     which curl > /dev/null
     if [ $? -gt 0 ]; then
-	echo "The 'curl' command is either not installed or not on the PATH ..."
+        echo "The 'curl' command is either not installed or not on the PATH ..."
 
-	if [ $DEPS = "true" ]; then
-	    echo "Installing curl ..."
+        if [ $DEPS = "true" ]; then
+            echo "Installing curl ..."
 
-	    if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-		sudo $APT_CMD update > /dev/null
-		sudo $APT_CMD install curl
+            if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+                sudo $APT_CMD update > /dev/null
+                sudo $APT_CMD install curl
 
-	    elif [ $DISTRO = "CentOS" ]; then
-		if [ $MACHINE = "i686" ]; then
-		    sudo $YUM_CMD install curl.i686
-		fi
+            elif [ $DISTRO = "CentOS" ]; then
+                if [ $MACHINE = "i686" ]; then
+                    sudo $YUM_CMD install curl.i686
+                fi
 
-		if [ $MACHINE = "x86_64" ]; then
-		    sudo $YUM_CMD install curl.x86_64
-		fi
-	    fi
-	else
-	    echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
-	    exit 1
-	fi
+                if [ $MACHINE = "x86_64" ]; then
+                    sudo $YUM_CMD install curl.x86_64
+                fi
+            fi
+        else
+            echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+            exit 1
+        fi
     fi
     CURL="`which curl` --sslv3"
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-	test -f /usr/lib/apt/methods/https
-	if [ $? -gt 0 ];then
-	    echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
+        test -f /usr/lib/apt/methods/https
+        if [ $? -gt 0 ];then
+            echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
 
-	    if [ $DEPS = "true" ]; then
-		echo "Installing apt-transport-https ..."
-		sudo $APT_CMD update > /dev/null
-		sudo $APT_CMD install apt-transport-https
-	    else
-		echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
-		exit 1
-	    fi
-	fi
+            if [ $DEPS = "true" ]; then
+                echo "Installing apt-transport-https ..."
+                sudo $APT_CMD update > /dev/null
+                sudo $APT_CMD install apt-transport-https
+            else
+                echo "To automatically install required components for Meter Install, rerun setup_meter.sh with -d flag."
+                exit 1
+            fi
+        fi
     fi
 }
 
@@ -452,10 +452,10 @@ fi
 
 while getopts "h di:" opts; do
     case $opts in
-	h) print_help;;
-	d) DEPS="true";;
-	i) APICREDS="$OPTARG";;
-	[?]) print_help;;
+        h) print_help;;
+        d) DEPS="true";;
+        i) APICREDS="$OPTARG";;
+        [?]) print_help;;
     esac
 done
 
@@ -487,8 +487,8 @@ fi
 # Check the distribution
 for d in ${PLATFORMS[*]} ; do
     if [ $DISTRO = $d ]; then
-	SUPPORTED_PLATFORM=1
-	break
+        SUPPORTED_PLATFORM=1
+        break
     fi
 done
 if [ $SUPPORTED_PLATFORM -eq 0 ]; then
