@@ -63,10 +63,10 @@ DEPS="false"
 trap "exit" INT TERM EXIT
 
 function print_supported_platforms() {
-    echo "Your platform is not supported. Supported platforms are:"
+    echo "Supported platforms are:"
     for d in ${PLATFORMS[*]}
     do
-        echo -n $d:
+        echo -n " * $d:"
         foo="\${${d}_VERSIONS[*]}"
         versions=`eval echo $foo`
         for v in $versions
@@ -75,8 +75,6 @@ function print_supported_platforms() {
         done
         echo ""
     done
-
-    exit 0
 }
 
 function check_distro_version() {
@@ -450,11 +448,24 @@ else
 fi
 
 
-while getopts "h di:" opts; do
+while getopts "h di:f:" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
         i) APICREDS="$OPTARG";;
+        f) echo "WARNING! You are OVERRIDING this script's OS detection."
+           echo "On unsupported platforms, your mileage may vary!"
+           print_supported_platforms
+           echo "Please contact support@boundary.com to request support for your architecture."
+
+           # This takes input basically of the form
+           # "`cat /etc/issue | head -n1`", for the OS you're mimicking.
+           # Examples include "CentOS release 6.2"; "Ubuntu 11.10".
+           PLATFORM="$OPTARG"
+           DISTRO=`echo $PLATFORM | awk '{print $1}'`
+
+           echo "Script will masquerade as \"$PLATFORM\""
+           ;;
         [?]) print_help;;
     esac
 done
@@ -492,13 +503,17 @@ for d in ${PLATFORMS[*]} ; do
     fi
 done
 if [ $SUPPORTED_PLATFORM -eq 0 ]; then
+    echo "Your platform is not supported."
     print_supported_platforms
+    exit 0
 fi
 
 # Check the version number
 check_distro_version "$PLATFORM" $DISTRO
 if [ $? -ne 0 ]; then
+    echo "This version is not supported."
     print_supported_platforms
+    exit 0
 fi
 
 echo "Detected $DISTRO $VERSION..."
