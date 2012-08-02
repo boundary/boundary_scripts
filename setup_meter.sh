@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 
 ##
 ### Copyright 2011, Boundary
