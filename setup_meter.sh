@@ -155,7 +155,7 @@ function create_meter() {
         -d "{\"name\": \"$HOSTNAME\"}" -u "$1:" \
         https://$APIHOST/$2/meters \
         | tr -d "\r" \
-        | awk '{split($0,a," "); print a[2]}'`
+        | awk '/^HTTP\/1\./ {split($0,a," "); http=a[2]} /^Location: https:\/\// {split($0,a," "); url=a[2]} END {print http; print url}'`
 
     exit_status=$?
 
