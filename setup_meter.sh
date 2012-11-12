@@ -437,21 +437,25 @@ function pre_install_sanity() {
 }
 
 # Grab some system information
-if [ $DISTRO = "CentOS" ] ; then
-         PLATFORM=`cat /etc/redhat-release | head -n 1`
-         DISTRO=`echo $PLATFORM | awk '{print $1}'`
-         MACHINE=`uname -m`
+if [ -f /etc/redhat-release ] ; then
+    PLATFORM=`cat /etc/redhat-release | head -n 1`
+    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    MACHINE=`uname -m`
+elif [ -f /etc/lsb-release ] ; then
+    #Ubuntu version lsb-release - https://help.ubuntu.com/community/CheckingYourUbuntuVersion
+    . /etc/lsb-release
+    OS=$DISTRIB_ID
+    VER=$DISTRIB_RELEASE
+    MACHINE=`uname -m`
+elif [ -f /etc/debian_version ] ; then
+    #Debian Version /etc/debian_version - Source: http://www.debian.org/doc/manuals/debian-faq/ch-software.en.html#s-isitdebian
+    PLATFORM=`cat /etc/debian_version | head -n 1`
+    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    MACHINE=`uname -m`
 else
-    test -f /etc/issue
-    if [ $? -eq 0 ]; then
-        PLATFORM=`cat /etc/issue | head -n 1`
-        DISTRO=`echo $PLATFORM | awk '{print $1}'`
-        MACHINE=`uname -m`
-    else
-        PLATFORM="unknown"
-        DISTRO="unknown"
-        MACHINE=`uname -m`
-    fi
+    PLATFORM="unknown"
+    DISTRO="unknown"
+    MACHINE=`uname -m`
 fi
 
 
