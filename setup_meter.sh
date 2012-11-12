@@ -444,8 +444,9 @@ if [ -f /etc/redhat-release ] ; then
 elif [ -f /etc/lsb-release ] ; then
     #Ubuntu version lsb-release - https://help.ubuntu.com/community/CheckingYourUbuntuVersion
     . /etc/lsb-release
-    PLATFORM=$DISTRIB_ID
-    DISTRO=$DISTRIB_RELEASE
+    PLATFORM=$DISTRIB_DESCRIPTION
+    DISTRO=$DISTRIB_ID
+    VERSION=$DISTRIB_RELEASE
     MACHINE=`uname -m`
 elif [ -f /etc/debian_version ] ; then
     #Debian Version /etc/debian_version - Source: http://www.debian.org/doc/manuals/debian-faq/ch-software.en.html#s-isitdebian
