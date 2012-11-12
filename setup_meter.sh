@@ -437,15 +437,21 @@ function pre_install_sanity() {
 }
 
 # Grab some system information
-test -f /etc/issue
-if [ $? -eq 0 ]; then
-    PLATFORM=`cat /etc/issue | head -n 1`
-    DISTRO=`echo $PLATFORM | awk '{print $1}'`
-    MACHINE=`uname -m`
+if [ $DISTRO = "CentOS" ] ; then
+         PLATFORM=`cat /etc/redhat-release | head -n 1`
+         DISTRO=`echo $PLATFORM | awk '{print $1}'`
+         MACHINE=`uname -m`
 else
-    PLATFORM="unknown"
-    DISTRO="unknown"
-    MACHINE=`uname -m`
+    test -f /etc/issue
+    if [ $? -eq 0 ]; then
+        PLATFORM=`cat /etc/issue | head -n 1`
+        DISTRO=`echo $PLATFORM | awk '{print $1}'`
+        MACHINE=`uname -m`
+    else
+        PLATFORM="unknown"
+        DISTRO="unknown"
+        MACHINE=`uname -m`
+    fi
 fi
 
 
