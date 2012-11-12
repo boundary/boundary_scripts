@@ -81,12 +81,13 @@ function print_supported_platforms() {
 function check_distro_version() {
     PLATFORM=$1
     DISTRO=$2
+    VERSION=$3
 
     TEMP="\${${DISTRO}_versions[*]}"
     VERSIONS=`eval echo $TEMP`
 
     if [ $DISTRO = "Ubuntu" ]; then
-        VERSION=`echo $PLATFORM | awk '{print $2}'`
+        #VERSION=`echo $PLATFORM | awk '{print $2}'`
 
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
@@ -102,12 +103,12 @@ function check_distro_version() {
 
     elif [ $DISTRO = "CentOS" ]; then
         # Works for centos 5
-        VERSION=`echo $PLATFORM | awk '{print $3}'`
+        #VERSION=`echo $PLATFORM | awk '{print $3}'`
 
         # Hack for centos 6
-        if [ $VERSION = "release" ]; then
-            VERSION=`echo $PLATFORM | awk '{print $4}'`
-        fi
+        #if [ $VERSION = "release" ]; then
+        #    VERSION=`echo $PLATFORM | awk '{print $4}'`
+        #fi
 
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
@@ -121,7 +122,7 @@ function check_distro_version() {
         done
 
     elif [ $DISTRO = "Debian" ]; then
-        VERSION=`echo $PLATFORM | awk '{print $3}'`
+        #VERSION=`echo $PLATFORM | awk '{print $3}'`
 
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
@@ -451,8 +452,10 @@ elif [ -f /etc/lsb-release ] ; then
     MACHINE=`uname -m`
 elif [ -f /etc/debian_version ] ; then
     #Debian Version /etc/debian_version - Source: http://www.debian.org/doc/manuals/debian-faq/ch-software.en.html#s-isitdebian
-    PLATFORM=`cat /etc/debian_version | head -n 1`
-    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    DISTRO="Debian"
+    VERSION=`cat /etc/debian_version`
+    INFO="$DISTRO $VERSION"
+    PLATFORM=$INFO
     MACHINE=`uname -m`
 else
     PLATFORM="unknown"
@@ -522,7 +525,7 @@ if [ $SUPPORTED_PLATFORM -eq 0 ]; then
 fi
 
 # Check the version number
-check_distro_version "$PLATFORM" $DISTRO
+check_distro_version "$PLATFORM" $DISTRO $VERSION
 if [ $? -ne 0 ]; then
     echo "This version is not supported."
     print_supported_platforms
