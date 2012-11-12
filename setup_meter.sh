@@ -438,8 +438,9 @@ function pre_install_sanity() {
 
 # Grab some system information
 if [ -f /etc/redhat-release ] ; then
-    PLATFORM=`cat /etc/redhat-release | head -n 1`
-    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    PLATFORM=`cat /etc/redhat-release`
+    DISTRO=`echo ${PLATFORM:0:6}`
+    VERSION=`echo ${PLATFORM:15:3}`
     MACHINE=`uname -m`
 elif [ -f /etc/lsb-release ] ; then
     #Ubuntu version lsb-release - https://help.ubuntu.com/community/CheckingYourUbuntuVersion
