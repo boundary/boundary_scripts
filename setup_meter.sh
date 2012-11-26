@@ -18,7 +18,7 @@ set -o pipefail
 ###
 
 # ARCHS=("i686" "x86_64")
-PLATFORMS=("Ubuntu" "Debian" "CentOS")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -26,6 +26,7 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS")
 Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04")
 Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
+Amazon_VERSIONS=("2012.09")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -116,6 +117,19 @@ function check_distro_version() {
         VERSIONS=`eval echo $TEMP`
         for v in $VERSIONS ; do
             if [ "$MAJOR_VERSION" = "$v" ]; then
+                return 0
+            fi
+        done
+
+    elif [ $DISTRO = "Amazon" ]; then
+        VERSION=`echo $PLATFORM | awk '{print $5}'`
+        # Some of these include minor numbers. Trim.
+        VERSION=${VERSION:0:7}
+
+        TEMP="\${${DISTRO}_VERSIONS[*]}"
+        VERSIONS=`eval echo $TEMP`
+        for v in $VERSIONS ; do
+            if [ "$VERSION" = "$v" ]; then
                 return 0
             fi
         done
@@ -242,12 +256,18 @@ function do_install() {
         sudo $APT_CMD update > /dev/null
         sudo $APT_CMD install bprobe
         return $?
-    elif [ "$DISTRO" = "CentOS" ]; then
+    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ]; then
         GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
         if [ $MACHINE = "i686" ]; then
             ARCH_STR="i386/"
         elif [ $MACHINE = "x86_64" ]; then
             ARCH_STR="x86_64/"
+        fi
+
+        # Amazon hack: we know the Amazon Linux AMIs are binary
+        # compatible with CentOS
+        if [ $DISTRO = "Amazon" ]; then
+            MAJOR_VERSION=6
         fi
 
         echo "Adding repository http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR"
@@ -403,7 +423,7 @@ function pre_install_sanity() {
                 sudo $APT_CMD update > /dev/null
                 sudo $APT_CMD install curl
 
-            elif [ $DISTRO = "CentOS" ]; then
+            elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ]; then
                 if [ $MACHINE = "i686" ]; then
                     sudo $YUM_CMD install curl.i686
                 fi
