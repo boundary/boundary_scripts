@@ -88,8 +88,6 @@ function check_distro_version() {
     VERSIONS=`eval echo $TEMP`
 
     if [ $DISTRO = "Ubuntu" ]; then
-        #VERSION=`echo $PLATFORM | awk '{print $2}'`
-
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
         PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
@@ -103,14 +101,6 @@ function check_distro_version() {
         done
 
     elif [ $DISTRO = "CentOS" ]; then
-        # Works for centos 5
-        #VERSION=`echo $PLATFORM | awk '{print $3}'`
-
-        # Hack for centos 6
-        #if [ $VERSION = "release" ]; then
-        #    VERSION=`echo $PLATFORM | awk '{print $4}'`
-        #fi
-
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
@@ -136,8 +126,6 @@ function check_distro_version() {
         done
 
     elif [ $DISTRO = "Debian" ]; then
-        #VERSION=`echo $PLATFORM | awk '{print $3}'`
-
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
