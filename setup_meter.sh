@@ -18,7 +18,7 @@ set -o pipefail
 ###
 
 # ARCHS=("i686" "x86_64")
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -27,6 +27,7 @@ Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04")
 Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09")
+RHEL_VERSIONS=("5" "6")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -41,6 +42,8 @@ map Ubuntu 11.10 oneiric
 map Ubuntu 12.04 precise
 map Debian 5 lenny
 map Debian 6 squeeze
+map RHEL 5 Tikanga
+map RHEL 6 Santiago
 
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
@@ -100,7 +103,7 @@ function check_distro_version() {
             fi
         done
 
-    elif [ $DISTRO = "CentOS" ]; then
+    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
@@ -245,7 +248,7 @@ function do_install() {
         sudo $APT_CMD update > /dev/null
         sudo $APT_CMD install bprobe
         return $?
-    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ]; then
+    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
         GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
         if [ $MACHINE = "i686" ]; then
             ARCH_STR="i386/"
@@ -412,7 +415,7 @@ function pre_install_sanity() {
                 sudo $APT_CMD update > /dev/null
                 sudo $APT_CMD install curl
 
-            elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ]; then
+            elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
                 if [ $MACHINE = "i686" ]; then
                     sudo $YUM_CMD install curl.i686
                 fi
@@ -448,8 +451,24 @@ function pre_install_sanity() {
 # Grab some system information
 if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
-    DISTRO=`echo ${PLATFORM:0:6}`
-    VERSION=`echo ${PLATFORM:15:3}`
+    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    if [ "$DISTRO" != "CentOS" ]; then
+	if [ "$DISTRO" = "Red" ]; then
+		DISTRO="RHEL"
+		VERSION=`echo $PLATFORM | awk '{print $7}'`
+	else
+		DISTRO="unknown"
+		PLATFORM="unknown"
+		VERSION="unknown"
+	fi
+    elif [ "$DISTRO" = "CentOS" ]; then
+	VERSION=`echo $PLATFORM | awk '{print $3}'`
+    fi
+    MACHINE=`uname -m`
+elif [ -f /etc/system-release ]; then
+    PLATFORM=`cat /etc/system-release | head -n 1`
+    DISTRO=`echo $PLATFORM | awk '{print $1}'`
+    VERSION=`echo $PLATFORM | awk '{print $5}'`
     MACHINE=`uname -m`
 elif [ -f /etc/lsb-release ] ; then
     #Ubuntu version lsb-release - https://help.ubuntu.com/community/CheckingYourUbuntuVersion
@@ -470,7 +489,6 @@ else
     DISTRO="unknown"
     MACHINE=`uname -m`
 fi
-
 
 while getopts "h di:f:" opts; do
     case $opts in
