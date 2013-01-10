@@ -500,11 +500,12 @@ while getopts "h di:f:" opts; do
            print_supported_platforms
            echo "Please contact support@boundary.com to request support for your architecture."
 
-           # This takes input basically of the form
-           # "`cat /etc/issue | head -n1`", for the OS you're mimicking.
-           # Examples include "CentOS release 6.2"; "Ubuntu 11.10".
+           # This takes input basically of the form "OS VERSION" for the OS
+           # you're mimicking.
+           # E.g., "CentOS 6.2", "Ubuntu 11.10", etc.
            PLATFORM="$OPTARG"
            DISTRO=`echo $PLATFORM | awk '{print $1}'`
+           VERSION=`echo $PLATFORM | awk '{print $2}'`
 
            echo "Script will masquerade as \"$PLATFORM\""
            ;;
