@@ -18,7 +18,7 @@ set -o pipefail
 ###
 
 # ARCHS=("i686" "x86_64")
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -28,6 +28,7 @@ Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09")
 RHEL_VERSIONS=("5" "6")
+SmartOS_VERSIONS=("joyent_20121228T011955Z")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -64,6 +65,7 @@ APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
 
 DEPS="false"
+CACERTS=
 
 trap "exit" INT TERM EXIT
 
@@ -136,6 +138,15 @@ function check_distro_version() {
         VERSIONS=`eval echo $TEMP`
         for v in $VERSIONS ; do
             if [ "$MAJOR_VERSION" = "$v" ]; then
+                return 0
+            fi
+        done
+
+    elif [ $DISTRO = "SmartOS" ]; then
+        TEMP="\${${DISTRO}_VERSIONS[*]}"
+        VERSIONS=`eval echo $TEMP`
+        for v in $VERSIONS ; do
+            if [ "$VERSION" = "$v" ]; then
                 return 0
             fi
         done
@@ -281,6 +292,18 @@ EOF"
 
         sudo $YUM_CMD install bprobe
         return $?
+    elif [ "$DISTRO" = "SmartOS" ]; then
+      grep "http://smartos\.boundary\.com/i386" /opt/local/etc/pkgin/repositories.conf > /dev/null
+
+      if [ "$?" = "1" ]; then
+        echo "http://smartos.boundary.com/i386/" >> /opt/local/etc/pkgin/repositories.conf
+      fi
+
+      pkgin -fy up
+      pkgin -y install bprobe
+      svccfg import /opt/custom/smf/boundary-meter.xml
+      svcadm enable boundary/meter
+      return $?
     fi
 }
 
@@ -291,7 +314,11 @@ function setup_cert_key() {
 
     if [ $? -eq 1 ]; then
         echo "Creating meter config directory ($TARGET_DIR) ..."
-        sudo mkdir $TARGET_DIR
+        if [ $DISTRO = "SmartOS" ]; then
+            mkdir $TARGET_DIR
+        else
+            sudo mkdir $TARGET_DIR
+        fi
     fi
 
     test -f $TARGET_DIR/key.pem
@@ -299,14 +326,22 @@ function setup_cert_key() {
     if [ $? -eq 1 ]; then
         echo "Key file is missing, attempting to download ..."
         echo "Downloading meter key for $2"
-        $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
+        if [ $DISTRO = "SmartOS" ]; then
+            $CURL -s -u $1: $2/key.pem | tee $TARGET_DIR/key.pem > /dev/null
+        else
+            $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
+        fi
 
         if [ $? -gt 0 ]; then
             echo "Error downloading key ..."
             exit 1
         fi
 
-        sudo chmod 600 $TARGET_DIR/key.pem
+        if [ $DISTRO = "SmartOS" ]; then
+            chmod 600 $TARGET_DIR/key.pem
+        else
+            sudo chmod 600 $TARGET_DIR/key.pem
+        fi
     fi
 
     test -f $TARGET_DIR/cert.pem
@@ -314,14 +349,22 @@ function setup_cert_key() {
     if [ $? -eq 1 ]; then
         echo "Cert file is missing, attempting to download ..."
         echo "Downloading meter certificate for $2"
-        $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
+        if [ $DISTRO = "SmartOS" ]; then
+            $CURL -s -u $1: $2/cert.pem | tee $TARGET_DIR/cert.pem > /dev/null
+        else
+            $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
+        fi
 
         if [ $? -gt 0 ]; then
             echo "Error downloading certificate ..."
             exit 1
         fi
 
-        sudo chmod 600 $TARGET_DIR/cert.pem
+        if [ $DISTRO = "SmartOS" ]; then
+            chmod 600 $TARGET_DIR/cert.pem
+        else
+            sudo chmod 600 $TARGET_DIR/cert.pem
+        fi
     fi
 }
 
@@ -397,11 +440,17 @@ function ec2_tag() {
 }
 
 function pre_install_sanity() {
-    SUDO=`which sudo`
-    if [ $? -ne 0 ]; then
-        echo "This script requires that sudo be installed and configured for your user."
-        echo "Please install sudo. For assistance, support@boundary.com"
-        exit 1
+    if [ $DISTRO != "SmartOS" ]; then
+      SUDO=`which sudo`
+      if [ $? -ne 0 ]; then
+          echo "This script requires that sudo be installed and configured for your user."
+          echo "Please install sudo. For assistance, support@boundary.com"
+          exit 1
+      fi
+    else
+	CACERTS=`mktemp boundary-cacert.XXXXXXXX`
+        curl http://curl.haxx.se/ca/cacert.pem > $CACERTS
+        TARGET_DIR="/opt/local/etc/bprobe"
     fi
 
     which curl > /dev/null
@@ -429,7 +478,12 @@ function pre_install_sanity() {
             exit 1
         fi
     fi
-    CURL="`which curl` --sslv3"
+
+    if [ $DISTRO = "SmartOS" ]; then
+      CURL="`which curl` --sslv3 --cacert $CACERTS"
+    else
+      CURL="`which curl` --sslv3"
+    fi
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
         test -f /usr/lib/apt/methods/https
@@ -453,16 +507,16 @@ if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
     DISTRO=`echo $PLATFORM | awk '{print $1}'`
     if [ "$DISTRO" != "CentOS" ]; then
-	if [ "$DISTRO" = "Red" ]; then
-		DISTRO="RHEL"
-		VERSION=`echo $PLATFORM | awk '{print $7}'`
-	else
-		DISTRO="unknown"
-		PLATFORM="unknown"
-		VERSION="unknown"
-	fi
+        if [ "$DISTRO" = "Red" ]; then
+                DISTRO="RHEL"
+                VERSION=`echo $PLATFORM | awk '{print $7}'`
+        else
+                DISTRO="unknown"
+                PLATFORM="unknown"
+                VERSION="unknown"
+        fi
     elif [ "$DISTRO" = "CentOS" ]; then
-	VERSION=`echo $PLATFORM | awk '{print $3}'`
+        VERSION=`echo $PLATFORM | awk '{print $3}'`
     fi
     MACHINE=`uname -m`
 elif [ -f /etc/system-release ]; then
@@ -485,9 +539,17 @@ elif [ -f /etc/debian_version ] ; then
     PLATFORM=$INFO
     MACHINE=`uname -m`
 else
-    PLATFORM="unknown"
-    DISTRO="unknown"
-    MACHINE=`uname -m`
+    PLATFORM=`uname -sv | grep 'SunOS joyent'` > /dev/null
+    if [ "$?" = "0" ]; then
+      PLATFORM="SmartOS"
+      DISTRO="SmartOS"
+      VERSION=`uname -sv | awk ' { print $2 } '`
+      MACHINE="i686"
+    else
+      PLATFORM="unknown"
+      DISTRO="unknown"
+      MACHINE=`uname -m`
+    fi
 fi
 
 while getopts "h di:f:" opts; do
@@ -601,6 +663,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+if [ $CACERTS != "" ]; then
+  rm $CACERTS
+fi
 
 echo ""
 echo "The meter has been installed successfully!"
