@@ -663,7 +663,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-if [ $CACERTS != "" ]; then
+if [ -z "$CACERTS" ]; then
   rm $CACERTS
 fi
 
