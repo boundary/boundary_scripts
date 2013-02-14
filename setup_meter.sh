@@ -663,8 +663,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-if [ -z "$CACERTS" ]; then
-  rm $CACERTS
+if [ -n "$CACERTS" ]; then
+  rm -f $CACERTS
 fi
 
 echo ""
