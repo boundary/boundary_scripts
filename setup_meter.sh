@@ -439,7 +439,7 @@ function ec2_tag() {
 #set EC2_ACCESS_KEY and EC2_SECRET_KEY_ID via export prior to script run
 #because AWS is awesomely inconsistent in command line tools, safest to set the following, but I don't know how to test which are actually used:
 #AWS_ACCESS_KEY, AWS_SECRET_KEY_ID, AWS_SECRET_KEY, EC2_ACCESS_KEY, EC2_SECRET_KEY, EC2_SECRET_KEY_ID
-    for tag in `ec2-describe-tags --filter "resource-id=\`curl -s http://169.254.169.254/latest/meta-data/instance-id\`" | grep -v Name | awk '/TAG/ {print $4"-"$5}'`; do
+    for tag in `ec2-describe-tags --filter "resource-id=\`curl -s http://169.254.169.254/latest/meta-data/instance-id\`" | grep -v Name | sed 's/[ \t]/ /g' | cut -d " " -f 5-`; do
         $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/$tag"
     done
 #rtice hacks end
