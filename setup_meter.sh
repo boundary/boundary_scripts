@@ -28,7 +28,7 @@ Debian_VERSIONS=("5" "6")
 CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09")
 RHEL_VERSIONS=("5" "6")
-SmartOS_VERSIONS=("joyent_20121228T011955Z")
+SmartOS_VERSIONS=("1")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -302,6 +302,11 @@ EOF"
       pkgin -fy up
       pkgin -y install bprobe
       svccfg import /opt/custom/smf/boundary-meter.xml
+      if [ "$JOYENT" = "Joyent" ]; then
+          cat /opt/custom/bin/boundary-meter.sh | grep -v "\\-\\-no-promisc" | sed "s/daemon-mode \\\\/daemon-mode/g" > /tmp/boundary-meter.sh
+          mv /tmp/boundary-meter.sh /opt/custom/bin/boundary-meter.sh
+          chmod a+x /opt/custom/bin/boundary-meter.sh
+      fi
       svcadm enable boundary/meter
       return $?
     fi
@@ -440,17 +445,15 @@ function ec2_tag() {
 }
 
 function pre_install_sanity() {
-    if [ $DISTRO != "SmartOS" ]; then
-      SUDO=`which sudo`
-      if [ $? -ne 0 ]; then
-          echo "This script requires that sudo be installed and configured for your user."
-          echo "Please install sudo. For assistance, support@boundary.com"
-          exit 1
-      fi
-    else
-	CACERTS=`mktemp boundary-cacert.XXXXXXXX`
-        curl http://curl.haxx.se/ca/cacert.pem > $CACERTS
-        TARGET_DIR="/opt/local/etc/bprobe"
+    SUDO=`which sudo`
+    if [ $? -ne 0 ]; then
+        echo "This script requires that sudo be installed and configured for your user."
+        echo "Please install sudo. For assistance, support@boundary.com"
+        exit 1
+    fi
+    
+    if [ $DISTRO = "SmartOS" ]; then  
+      TARGET_DIR="/opt/local/etc/bprobe"
     fi
 
     which curl > /dev/null
@@ -479,11 +482,7 @@ function pre_install_sanity() {
         fi
     fi
 
-    if [ $DISTRO = "SmartOS" ]; then
-      CURL="`which curl` --sslv3 --cacert $CACERTS"
-    else
-      CURL="`which curl` --sslv3"
-    fi
+    CURL="`which curl` --sslv3"
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
         test -f /usr/lib/apt/methods/https
@@ -543,8 +542,9 @@ else
     if [ "$?" = "0" ]; then
       PLATFORM="SmartOS"
       DISTRO="SmartOS"
-      VERSION=`uname -sv | awk ' { print $2 } '`
+      VERSION=`cat /etc/product | grep 'Image' | awk '{ print $3}' | awk -F. '{print $1}'`
       MACHINE="i686"
+      JOYENT=`cat /etc/product | grep 'Name' | awk '{ print $2}'`
     else
       PLATFORM="unknown"
       DISTRO="unknown"
