@@ -177,6 +177,12 @@ function print_help() {
 
 function create_meter() {
 
+    if [ "${HOSTNAME}" = "" ]; then
+        echo "Host does not appear to have a hostname set!"
+        echo "For assistance, please contain support@boundary.com"
+        exit 1
+    fi
+
     RESULT=`$CURL --connect-timeout 5 -i -s -X POST \
         -H "Content-Type: application/json" \
         -d "{\"name\": \"$HOSTNAME\"}" -u "$1:" \
@@ -321,7 +327,7 @@ EOF"
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        curl -s "https://freebsd.boundary.com/${VERSION:0:3}/bprobe-current.tgz" > bprobe-current.tgz
+        $CURL -s "https://freebsd.boundary.com/${VERSION:0:3}/bprobe-current.tgz" > bprobe-current.tgz
         pkg_add bprobe-current.tgz
 
         return $?
@@ -471,8 +477,8 @@ function pre_install_sanity() {
     # freebsd support doesn't currently assume sudo exists, prefers
     # root access
     elif [ "`whoami`" != "root" ] ; then
-        echo "FreeBSD: please run this script as the root user, or via su -c as any"
-        echo "user that is also a member of the 'wheel' group."
+        echo "FreeBSD: please run this script as the root user, or if you are a user in"
+        echo "the 'wheel' group, run the same command within 'su root -c \"...\"'"
         echo "For assistance, contact support@boundary.com"
         exit 1
     fi
