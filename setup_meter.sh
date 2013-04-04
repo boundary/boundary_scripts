@@ -162,7 +162,7 @@ function check_distro_version() {
         done
     fi
 
-    echo "Detected $DISTRO but with an unsupported version ($MAJOR_VERSION.$MINOR_VERSION)"
+    echo "Detected $DISTRO but with an unsupported version ($VERSION)"
     return 1
 }
 
@@ -592,24 +592,20 @@ else
     fi
 fi
 
-while getopts "h di:f:" opts; do
+echo "Detected $DISTRO $VERSION..."
+echo ""
+IGNORE_RELEASE=0
+
+while getopts "h di:f" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
         i) APICREDS="$OPTARG";;
-        f) echo "WARNING! You are OVERRIDING this script's OS detection."
-           echo "On unsupported platforms, your mileage may vary!"
+        f) echo "WARNING! You are choosing to ignore the release number for your distribution!"
+           echo "On unsupported releases, your mileage may vary!"
            print_supported_platforms
            echo "Please contact support@boundary.com to request support for your architecture."
-
-           # This takes input basically of the form "OS VERSION" for the OS
-           # you're mimicking.
-           # E.g., "CentOS 6.2", "Ubuntu 11.10", etc.
-           PLATFORM="$OPTARG"
-           DISTRO=`echo $PLATFORM | awk '{print $1}'`
-           VERSION=`echo $PLATFORM | awk '{print $2}'`
-
-           echo "Script will masquerade as \"$PLATFORM\""
+           IGNORE_RELEASE=1
            ;;
         [?]) print_help;;
     esac
@@ -653,16 +649,26 @@ if [ $SUPPORTED_PLATFORM -eq 0 ]; then
     exit 0
 fi
 
-# Check the version number
-check_distro_version "$PLATFORM" $DISTRO $VERSION
-if [ $? -ne 0 ]; then
-    echo "This version is not supported."
-    print_supported_platforms
-    exit 0
-fi
+if [ $IGNORE_RELEASE -ne 1 ]; then
+    # Check the version number
+    check_distro_version "$PLATFORM" $DISTRO $VERSION
+    if [ $? -ne 0 ]; then
+        echo "This version is not supported."
+        print_supported_platforms
+        exit 0
+    fi
+else
+    TEMP="\${${DISTRO}_VERSIONS[*]}"
+    VERSIONS=`eval echo $TEMP`
+    # Assume ordered list; grab latest version
+    VERSION=`echo $VERSIONS | awk '{print $NF}'`
+    MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+    MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
 
-echo "Detected $DISTRO $VERSION..."
-echo ""
+    echo ""
+    echo "Continuing; for reference, script is masquerading as: $DISTRO $VERSION"
+    echo ""
+fi
 
 # At this point, we think we have a supported OS.
 pre_install_sanity $d $v
