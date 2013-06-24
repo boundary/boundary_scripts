@@ -54,7 +54,7 @@ APIHOST="api.boundary.com"
 TARGET_DIR="/etc/bprobe"
 
 EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
-TAGS="instance-type placement/availability-zone security-groups"
+TAGS="instance-type placement/availability-zone"
 
 SUPPORTED_ARCH=0
 SUPPORTED_PLATFORM=0
