@@ -596,17 +596,11 @@ echo "Detected $DISTRO $VERSION..."
 echo ""
 IGNORE_RELEASE=0
 
-while getopts "h di:f" opts; do
+while getopts "h di:" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
         i) APICREDS="$OPTARG";;
-        f) echo "WARNING! You are choosing to ignore the release number for your distribution!"
-           echo "On unsupported releases, your mileage may vary!"
-           print_supported_platforms
-           echo "Please contact support@boundary.com to request support for your architecture."
-           IGNORE_RELEASE=1
-           ;;
         [?]) print_help;;
     esac
 done
@@ -653,11 +647,14 @@ if [ $IGNORE_RELEASE -ne 1 ]; then
     # Check the version number
     check_distro_version "$PLATFORM" $DISTRO $VERSION
     if [ $? -ne 0 ]; then
-        echo "This version is not supported."
-        print_supported_platforms
-        exit 0
+        IGNORE_RELEASE=1
+        echo "Detected $PLATFORM $DISTRO $VERSION"
     fi
-else
+fi
+
+# The version number hasn't been found; let's just try and masquerade
+# (and tell users what we're doing)
+if [ $IGNORE_RELEASE ] ; then
     TEMP="\${${DISTRO}_VERSIONS[*]}"
     VERSIONS=`eval echo $TEMP`
     # Assume ordered list; grab latest version
