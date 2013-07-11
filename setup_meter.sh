@@ -18,7 +18,7 @@ set -o pipefail
 ###
 
 # ARCHS=("i686" "x86_64")
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "FreeBSD")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -29,7 +29,6 @@ CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1")
-FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 9.0-RELEASE 9.1-RELEASE")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -144,15 +143,6 @@ function check_distro_version() {
         done
 
     elif [ $DISTRO = "SmartOS" ]; then
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
-
-    elif [ $DISTRO = "FreeBSD" ]; then
         TEMP="\${${DISTRO}_VERSIONS[*]}"
         VERSIONS=`eval echo $TEMP`
         for v in $VERSIONS ; do
@@ -325,12 +315,6 @@ EOF"
       fi
       svcadm enable boundary/meter
       return $?
-
-    elif [ "$DISTRO" = "FreeBSD" ]; then
-        $CURL -s "https://freebsd.boundary.com/${VERSION:0:3}/bprobe-current.tgz" > bprobe-current.tgz
-        pkg_add bprobe-current.tgz
-
-        return $?
     fi
 }
 
@@ -341,7 +325,7 @@ function setup_cert_key() {
 
     if [ $? -eq 1 ]; then
         echo "Creating meter config directory ($TARGET_DIR) ..."
-        if [ $DISTRO = "SmartOS" ] || [ $DISTRO = "FreeBSD" ]; then
+        if [ $DISTRO = "SmartOS" ]; then
             mkdir $TARGET_DIR
         else
             sudo mkdir $TARGET_DIR
@@ -353,7 +337,7 @@ function setup_cert_key() {
     if [ $? -eq 1 ]; then
         echo "Key file is missing, attempting to download ..."
         echo "Downloading meter key for $2"
-        if [ $DISTRO = "SmartOS" ] || [ $DISTRO = "FreeBSD" ]; then
+        if [ $DISTRO = "SmartOS" ]; then
             $CURL -s -u $1: $2/key.pem | tee $TARGET_DIR/key.pem > /dev/null
         else
             $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
@@ -364,7 +348,7 @@ function setup_cert_key() {
             exit 1
         fi
 
-        if [ $DISTRO = "SmartOS" ] || [ $DISTRO = "FreeBSD" ]; then
+        if [ $DISTRO = "SmartOS" ]; then
             chmod 600 $TARGET_DIR/key.pem
         else
             sudo chmod 600 $TARGET_DIR/key.pem
@@ -376,7 +360,7 @@ function setup_cert_key() {
     if [ $? -eq 1 ]; then
         echo "Cert file is missing, attempting to download ..."
         echo "Downloading meter certificate for $2"
-        if [ $DISTRO = "SmartOS" ] || [ $DISTRO = "FreeBSD" ]; then
+        if [ $DISTRO = "SmartOS" ]; then
             $CURL -s -u $1: $2/cert.pem | tee $TARGET_DIR/cert.pem > /dev/null
         else
             $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
@@ -387,7 +371,7 @@ function setup_cert_key() {
             exit 1
         fi
 
-        if [ $DISTRO = "SmartOS" ] || [ $DISTRO = "FreeBSD" ]; then
+        if [ $DISTRO = "SmartOS" ]; then
             chmod 600 $TARGET_DIR/cert.pem
         else
             sudo chmod 600 $TARGET_DIR/cert.pem
@@ -467,19 +451,10 @@ function ec2_tag() {
 }
 
 function pre_install_sanity() {
-    if [ $DISTRO != "FreeBSD" ] ; then
-        SUDO=`which sudo`
-        if [ $? -ne 0 ]; then
-            echo "This script requires that sudo be installed and configured for your user."
-            echo "Please install sudo. For assistance, support@boundary.com"
-            exit 1
-        fi
-    # freebsd support doesn't currently assume sudo exists, prefers
-    # root access
-    elif [ "`whoami`" != "root" ] ; then
-        echo "FreeBSD: please run this script as the root user, or if you are a user in"
-        echo "the 'wheel' group, run the same command within 'su root -c \"...\"'"
-        echo "For assistance, contact support@boundary.com"
+    SUDO=`which sudo`
+    if [ $? -ne 0 ]; then
+        echo "This script requires that sudo be installed and configured for your user."
+        echo "Please install sudo. For assistance, support@boundary.com"
         exit 1
     fi
     
@@ -578,17 +553,9 @@ else
       JOYENT=`cat /etc/product | grep 'Name' | awk '{ print $2}'`
 
     elif [ "$?" != "0" ]; then
-      uname -sv | grep 'FreeBSD' > /dev/null
-      if [ "$?" = "0" ]; then
-        PLATFORM="FreeBSD"
-        DISTRO="FreeBSD"
-        VERSION=`uname -sv | awk ' { print $3 } '`
-        MACHINE=`uname -m`
-      else
         PLATFORM="unknown"
         DISTRO="unknown"
         MACHINE=`uname -m`
-      fi
     fi
 fi
 
