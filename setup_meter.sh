@@ -488,7 +488,11 @@ function pre_install_sanity() {
         fi
     fi
 
-    CURL="`which curl` --sslv3"
+    if [ $DISTRO = "SmartOS" ]; then
+        CURL="`which curl` -k"
+    else
+        CURL="`which curl` --sslv3"
+    fi
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
         test -f /usr/lib/apt/methods/https
