@@ -457,8 +457,8 @@ function pre_install_sanity() {
         echo "Please install sudo. For assistance, support@boundary.com"
         exit 1
     fi
-    
-    if [ $DISTRO = "SmartOS" ]; then  
+
+    if [ $DISTRO = "SmartOS" ]; then
       TARGET_DIR="/opt/local/etc/bprobe"
     fi
 
@@ -565,7 +565,6 @@ fi
 
 echo "Detected $DISTRO $VERSION..."
 echo ""
-IGNORE_RELEASE=0
 
 while getopts "h di:" opts; do
     case $opts in
@@ -614,18 +613,17 @@ if [ $SUPPORTED_PLATFORM -eq 0 ]; then
     exit 0
 fi
 
-if [ $IGNORE_RELEASE -ne 1 ]; then
-    # Check the version number
-    check_distro_version "$PLATFORM" $DISTRO $VERSION
-    if [ $? -ne 0 ]; then
-        IGNORE_RELEASE=1
-        echo "Detected $PLATFORM $DISTRO $VERSION"
-    fi
+# Check the version number
+UNSUPPORTED_RELEASE=0
+check_distro_version "$PLATFORM" $DISTRO $VERSION
+if [ $? -ne 0 ]; then
+	UNSUPPORTED_RELEASE=1
+	echo "Detected $PLATFORM $DISTRO $VERSION"
 fi
 
 # The version number hasn't been found; let's just try and masquerade
 # (and tell users what we're doing)
-if [ $IGNORE_RELEASE ] ; then
+if [ $UNSUPPORTED_RELEASE -eq 1 ] ; then
     TEMP="\${${DISTRO}_VERSIONS[*]}"
     VERSIONS=`eval echo $TEMP`
     # Assume ordered list; grab latest version
