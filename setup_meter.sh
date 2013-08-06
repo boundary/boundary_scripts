@@ -64,11 +64,13 @@ SUPPORTED_PLATFORM=0
 
 APT="apt.boundary.com"
 YUM="yum.boundary.com"
+SMARTOS="smartos.boundary.com"
 
 APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
 
 DEPS="false"
+STAGING="false"
 CACERTS=
 
 trap "exit" INT TERM EXIT
@@ -192,6 +194,10 @@ function create_meter() {
         echo "Your local version of curl has not been built with HTTPS support: `which curl`"
         exit 1
 
+    elif [ "$exit_status" -eq "6" ]; then
+        echo "Could not resolve $APIHOST, check network connectivity or DNS settings"
+        exit 1
+
     # if the exit code is 7, that means curl couldnt connect so we can bail
     elif [ "$exit_status" -eq "7" ]; then
         echo "Could not connect to create meter"
@@ -240,13 +246,13 @@ function do_install() {
     if [ "$DISTRO" = "Ubuntu" ]; then
         sudo $APT_CMD update > /dev/null
 
-        APT_STRING="deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+        APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
         echo "Adding repository $APT_STRING"
         sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
@@ -256,13 +262,13 @@ function do_install() {
     elif [ "$DISTRO" = "Debian" ]; then
         sudo $APT_CMD update > /dev/null
 
-        APT_STRING="deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main"
+        APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
         echo "Adding repository $APT_STRING"
         sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
@@ -283,12 +289,12 @@ function do_install() {
             MAJOR_VERSION=6
         fi
 
-        echo "Adding repository http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR"
+        echo "Adding repository http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR"
 
         sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
 [boundary]
 name=boundary
-baseurl=http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR
+baseurl=http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR
 gpgcheck=1
 gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
@@ -303,10 +309,10 @@ EOF"
         sudo $YUM_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
-      grep "http://smartos\.boundary\.com/i386" /opt/local/etc/pkgin/repositories.conf > /dev/null
+      grep "http://${SMARTOS}/i386" /opt/local/etc/pkgin/repositories.conf > /dev/null
 
       if [ "$?" = "1" ]; then
-        echo "http://smartos.boundary.com/i386/" >> /opt/local/etc/pkgin/repositories.conf
+        echo "http://${SMARTOS}/i386/" >> /opt/local/etc/pkgin/repositories.conf
       fi
 
       pkgin -fy up
@@ -574,10 +580,17 @@ while getopts "h di:" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
+		s) STAGING="true";;
         i) APICREDS="$OPTARG";;
         [?]) print_help;;
     esac
 done
+
+if [ $STAGING = "true" ]; then
+	APT="apt-staging.boundary.com"
+	YUM="yum-staging.boundary.com"
+	SMARTOS="smartos-staging.boundary.com"
+fi
 
 if [ -z $APICREDS ]; then
     print_help
