@@ -23,10 +23,10 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
-Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04")
-Debian_VERSIONS=("5" "6")
+Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10")
+Debian_VERSIONS=("5" "6" "7")
 CentOS_VERSIONS=("5" "6")
-Amazon_VERSIONS=("2012.09")
+Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1")
 
@@ -41,8 +41,12 @@ map Ubuntu 10.10 maverick
 map Ubuntu 11.04 natty
 map Ubuntu 11.10 oneiric
 map Ubuntu 12.04 precise
+map Ubuntu 12.10 quantal
+map Ubuntu 13.04 raring
+map Ubuntu 13.10 saucy
 map Debian 5 lenny
 map Debian 6 squeeze
+map Debian 7 wheezy
 map RHEL 5 Tikanga
 map RHEL 6 Santiago
 
