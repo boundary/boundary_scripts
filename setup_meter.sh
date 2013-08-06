@@ -28,7 +28,7 @@ Debian_VERSIONS=("5" "6" "7")
 CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
-SmartOS_VERSIONS=("1")
+SmartOS_VERSIONS=("1" "12" "13")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -149,6 +149,7 @@ function check_distro_version() {
         done
 
     elif [ $DISTRO = "SmartOS" ]; then
+        # SmartOS does not have version numbers
         TEMP="\${${DISTRO}_VERSIONS[*]}"
         VERSIONS=`eval echo $TEMP`
         for v in $VERSIONS ; do
@@ -309,20 +310,15 @@ EOF"
         sudo $YUM_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
-      grep "http://${SMARTOS}/i386" /opt/local/etc/pkgin/repositories.conf > /dev/null
+      grep "http://${SMARTOS}/${MACHINE}" /opt/local/etc/pkgin/repositories.conf > /dev/null
 
       if [ "$?" = "1" ]; then
-        echo "http://${SMARTOS}/i386/" >> /opt/local/etc/pkgin/repositories.conf
+        echo "http://${SMARTOS}/${MACHINE}/" >> /opt/local/etc/pkgin/repositories.conf
       fi
 
       pkgin -fy up
       pkgin -y install bprobe
       svccfg import /opt/custom/smf/boundary-meter.xml
-      if [ "$JOYENT" = "Joyent" ]; then
-          cat /opt/custom/bin/boundary-meter.sh | grep -v "\\-\\-no-promisc" | sed "s/daemon-mode \\\\/daemon-mode/g" > /tmp/boundary-meter.sh
-          mv /tmp/boundary-meter.sh /opt/custom/bin/boundary-meter.sh
-          chmod a+x /opt/custom/bin/boundary-meter.sh
-      fi
       svcadm enable boundary/meter
       return $?
     fi
@@ -562,10 +558,15 @@ else
     if [ "$?" = "0" ]; then
       PLATFORM="SmartOS"
       DISTRO="SmartOS"
-      VERSION=`cat /etc/product | grep 'Image' | awk '{ print $3}' | awk -F. '{print $1}'`
-      MACHINE="i686"
-      JOYENT=`cat /etc/product | grep 'Name' | awk '{ print $2}'`
-
+      MACHINE="i386"
+      VERSION=13
+      if [ -x /etc/product ]; then
+        grep "base64" /etc/product > /dev/null
+        if [ "$?" = "0" ]; then
+            MACHINE="x86_64"
+        fi
+        VERSION=`grep 'Image' /etc/product | awk '{ print $3}' | awk -F. '{print $1}'`
+      fi
     elif [ "$?" != "0" ]; then
         PLATFORM="unknown"
         DISTRO="unknown"
@@ -576,20 +577,20 @@ fi
 echo "Detected $DISTRO $VERSION..."
 echo ""
 
-while getopts "h di:" opts; do
+while getopts "hdsi:" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
-		s) STAGING="true";;
+        s) STAGING="true";;
         i) APICREDS="$OPTARG";;
         [?]) print_help;;
     esac
 done
 
 if [ $STAGING = "true" ]; then
-	APT="apt-staging.boundary.com"
-	YUM="yum-staging.boundary.com"
-	SMARTOS="smartos-staging.boundary.com"
+    APT="apt-staging.boundary.com"
+    YUM="yum-staging.boundary.com"
+    SMARTOS="smartos-staging.boundary.com"
 fi
 
 if [ -z $APICREDS ]; then
@@ -600,7 +601,7 @@ fi
 APIID=`echo $APICREDS | awk -F: '{print $1}'`
 APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 
-if [ $MACHINE = "i686" ]; then
+if [ $MACHINE = "i686" ] || [ $MACHINE = "i386" ]; then
     ARCH="32"
     SUPPORTED_ARCH=1
 fi
@@ -634,8 +635,8 @@ fi
 UNSUPPORTED_RELEASE=0
 check_distro_version "$PLATFORM" $DISTRO $VERSION
 if [ $? -ne 0 ]; then
-	UNSUPPORTED_RELEASE=1
-	echo "Detected $PLATFORM $DISTRO $VERSION"
+    UNSUPPORTED_RELEASE=1
+    echo "Detected $PLATFORM $DISTRO $VERSION"
 fi
 
 # The version number hasn't been found; let's just try and masquerade
