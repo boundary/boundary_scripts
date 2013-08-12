@@ -23,12 +23,12 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
-Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04")
-Debian_VERSIONS=("5" "6")
+Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10")
+Debian_VERSIONS=("5" "6" "7")
 CentOS_VERSIONS=("5" "6")
-Amazon_VERSIONS=("2012.09")
+Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
-SmartOS_VERSIONS=("1")
+SmartOS_VERSIONS=("1" "12" "13")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -41,8 +41,12 @@ map Ubuntu 10.10 maverick
 map Ubuntu 11.04 natty
 map Ubuntu 11.10 oneiric
 map Ubuntu 12.04 precise
+map Ubuntu 12.10 quantal
+map Ubuntu 13.04 raring
+map Ubuntu 13.10 saucy
 map Debian 5 lenny
 map Debian 6 squeeze
+map Debian 7 wheezy
 map RHEL 5 Tikanga
 map RHEL 6 Santiago
 
@@ -60,11 +64,13 @@ SUPPORTED_PLATFORM=0
 
 APT="apt.boundary.com"
 YUM="yum.boundary.com"
+SMARTOS="smartos.boundary.com"
 
 APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
 
 DEPS="false"
+STAGING="false"
 CACERTS=
 
 trap "exit" INT TERM EXIT
@@ -143,6 +149,7 @@ function check_distro_version() {
         done
 
     elif [ $DISTRO = "SmartOS" ]; then
+        # SmartOS does not have version numbers
         TEMP="\${${DISTRO}_VERSIONS[*]}"
         VERSIONS=`eval echo $TEMP`
         for v in $VERSIONS ; do
@@ -186,6 +193,10 @@ function create_meter() {
     # https hasn't been baked in.)
     if [ "$exit_status" -eq "1" ]; then
         echo "Your local version of curl has not been built with HTTPS support: `which curl`"
+        exit 1
+
+    elif [ "$exit_status" -eq "6" ]; then
+        echo "Could not resolve $APIHOST, check network connectivity or DNS settings"
         exit 1
 
     # if the exit code is 7, that means curl couldnt connect so we can bail
@@ -236,13 +247,13 @@ function do_install() {
     if [ "$DISTRO" = "Ubuntu" ]; then
         sudo $APT_CMD update > /dev/null
 
-        APT_STRING="deb https://apt.boundary.com/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+        APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
         echo "Adding repository $APT_STRING"
         sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
@@ -252,13 +263,13 @@ function do_install() {
     elif [ "$DISTRO" = "Debian" ]; then
         sudo $APT_CMD update > /dev/null
 
-        APT_STRING="deb https://apt.boundary.com/debian/ `get $DISTRO $MAJOR_VERSION` main"
+        APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
         echo "Adding repository $APT_STRING"
         sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://$APT/APT-GPG-KEY-Boundary | sudo apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$APT/APT-GPG-KEY-Boundary!"
+            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
@@ -279,12 +290,12 @@ function do_install() {
             MAJOR_VERSION=6
         fi
 
-        echo "Adding repository http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR"
+        echo "Adding repository http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR"
 
         sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
 [boundary]
 name=boundary
-baseurl=http://yum.boundary.com/centos/os/$MAJOR_VERSION/$ARCH_STR
+baseurl=http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR
 gpgcheck=1
 gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
@@ -299,20 +310,15 @@ EOF"
         sudo $YUM_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
-      grep "http://smartos\.boundary\.com/i386" /opt/local/etc/pkgin/repositories.conf > /dev/null
+      grep "http://${SMARTOS}/${MACHINE}" /opt/local/etc/pkgin/repositories.conf > /dev/null
 
       if [ "$?" = "1" ]; then
-        echo "http://smartos.boundary.com/i386/" >> /opt/local/etc/pkgin/repositories.conf
+        echo "http://${SMARTOS}/${MACHINE}/" >> /opt/local/etc/pkgin/repositories.conf
       fi
 
       pkgin -fy up
       pkgin -y install bprobe
       svccfg import /opt/custom/smf/boundary-meter.xml
-      if [ "$JOYENT" = "Joyent" ]; then
-          cat /opt/custom/bin/boundary-meter.sh | grep -v "\\-\\-no-promisc" | sed "s/daemon-mode \\\\/daemon-mode/g" > /tmp/boundary-meter.sh
-          mv /tmp/boundary-meter.sh /opt/custom/bin/boundary-meter.sh
-          chmod a+x /opt/custom/bin/boundary-meter.sh
-      fi
       svcadm enable boundary/meter
       return $?
     fi
@@ -552,10 +558,15 @@ else
     if [ "$?" = "0" ]; then
       PLATFORM="SmartOS"
       DISTRO="SmartOS"
-      VERSION=`cat /etc/product | grep 'Image' | awk '{ print $3}' | awk -F. '{print $1}'`
-      MACHINE="i686"
-      JOYENT=`cat /etc/product | grep 'Name' | awk '{ print $2}'`
-
+      MACHINE="i386"
+      VERSION=13
+      if [ -x /etc/product ]; then
+        grep "base64" /etc/product > /dev/null
+        if [ "$?" = "0" ]; then
+            MACHINE="x86_64"
+        fi
+        VERSION=`grep 'Image' /etc/product | awk '{ print $3}' | awk -F. '{print $1}'`
+      fi
     elif [ "$?" != "0" ]; then
         PLATFORM="unknown"
         DISTRO="unknown"
@@ -566,14 +577,21 @@ fi
 echo "Detected $DISTRO $VERSION..."
 echo ""
 
-while getopts "h di:" opts; do
+while getopts "hdsi:" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
+        s) STAGING="true";;
         i) APICREDS="$OPTARG";;
         [?]) print_help;;
     esac
 done
+
+if [ $STAGING = "true" ]; then
+    APT="apt-staging.boundary.com"
+    YUM="yum-staging.boundary.com"
+    SMARTOS="smartos-staging.boundary.com"
+fi
 
 if [ -z $APICREDS ]; then
     print_help
@@ -583,7 +601,7 @@ fi
 APIID=`echo $APICREDS | awk -F: '{print $1}'`
 APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 
-if [ $MACHINE = "i686" ]; then
+if [ $MACHINE = "i686" ] || [ $MACHINE = "i386" ]; then
     ARCH="32"
     SUPPORTED_ARCH=1
 fi
@@ -617,8 +635,8 @@ fi
 UNSUPPORTED_RELEASE=0
 check_distro_version "$PLATFORM" $DISTRO $VERSION
 if [ $? -ne 0 ]; then
-	UNSUPPORTED_RELEASE=1
-	echo "Detected $PLATFORM $DISTRO $VERSION"
+    UNSUPPORTED_RELEASE=1
+    echo "Detected $PLATFORM $DISTRO $VERSION"
 fi
 
 # The version number hasn't been found; let's just try and masquerade
