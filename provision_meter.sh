@@ -1,5 +1,5 @@
 ###
-### Copyright 2011, Boundary
+### Copyright 2011-2013, Boundary
 ###
 ### Licensed under the Apache License, Version 2.0 (the "License");
 ### you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 APIHOST="api.boundary.com"
 TARGET_DIR="/tmp"
 EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
-TAGS="instance-type placement/availability-zone security-groups"
+TAGS="instance-type placement/availability-zone"
 
 function print_help() {
   echo "./provision_meter.sh -i ORGID:APIKEY"
