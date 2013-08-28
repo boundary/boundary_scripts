@@ -70,7 +70,7 @@ def delete(orgid, apikey, path)
   
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  http.verify_mode = @verify_mode
   res = http.start do |http|
     http.request(req)
   end
