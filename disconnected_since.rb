@@ -11,7 +11,10 @@ opts = Trollop::options do
   opt :since, "How long ago is the cutoff for disconnected meters? format is \\d+[wdhms]", :type => :string, :default => "0s"
   opt :delete, "Shall I delete the selected list of meters? Will ask for confirmation", :type => :boolean, :default => false
   opt :force, "Do not ask for confirmation before deleting.", :type => :boolean, :default => false
+  opt :verify_none, "Set verify_none for the https connection.", :type => :boolean, :default => false
 end
+
+@verify_mode = opts[:verify_none] ? OpenSSL::SSL::VERIFY_NONE : OpenSSL::SSL::VERIFY_PEER
 
 Trollop::die :orgid, "must be supplied" if opts[:orgid].nil?
 Trollop::die :apikey, "must be supplied" if opts[:apikey].nil?
@@ -44,7 +47,7 @@ def get(orgid, apikey, path)
 
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  http.verify_mode = @verify_mode
   res = http.start do |http|
     http.request(req)
   end
