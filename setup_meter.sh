@@ -17,7 +17,6 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-# ARCHS=("i686" "x86_64")
 PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
 
 # Put additional version numbers here.
@@ -245,6 +244,7 @@ function create_meter() {
 
 function do_install() {
     if [ "$DISTRO" = "Ubuntu" ]; then
+        echo "Updating apt repository cache..."
         sudo $APT_CMD update > /dev/null
 
         APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
@@ -257,10 +257,12 @@ function do_install() {
             exit 1
         fi
 
+        echo "Updating apt repository cache..."
         sudo $APT_CMD update > /dev/null
         sudo $APT_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "Debian" ]; then
+        echo "Updating apt repository cache..."
         sudo $APT_CMD update > /dev/null
 
         APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
@@ -273,6 +275,7 @@ function do_install() {
             exit 1
         fi
 
+        echo "Updating apt repository cache..."
         sudo $APT_CMD update > /dev/null
         sudo $APT_CMD install bprobe
         return $?
@@ -476,6 +479,7 @@ function pre_install_sanity() {
             echo "Installing curl ..."
 
             if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+                echo "Updating apt repository cache..."
                 sudo $APT_CMD update > /dev/null
                 sudo $APT_CMD install curl
 
@@ -506,8 +510,9 @@ function pre_install_sanity() {
             echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
 
             if [ $DEPS = "true" ]; then
-                echo "Installing apt-transport-https ..."
+                echo "Updating apt repository cache..."
                 sudo $APT_CMD update > /dev/null
+                echo "Installing apt-transport-https ..."
                 sudo $APT_CMD install apt-transport-https
             else
                 echo "To automatically install required components for Meter Install, rerun $0 with -d flag."
@@ -601,9 +606,34 @@ fi
 APIID=`echo $APICREDS | awk -F: '{print $1}'`
 APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 
-if [ $MACHINE = "i686" ] || [ $MACHINE = "i386" ]; then
+if [ $MACHINE = "i686" ] ||
+   [ $MACHINE = "i586" ] ||
+   [ $MACHINE = "i386" ] ; then
     ARCH="32"
     SUPPORTED_ARCH=1
+fi
+
+#determine hard vs. soft float using readelf
+if [ -x /usr/bin/readelf ] ; then
+    HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
+    if [ -z "$HARDFLOAT" ]; then
+        if [ $MACHINE = "armv7l" ]
+           [ $MACHINE = "armv6l" ] ||
+           [ $MACHINE = "armv5tel" ] ||
+           [ $MACHINE = "armv5tejl" ] ; then
+            ARCH="32"
+            SUPPORTED_ARCH=1
+            echo "Detected $MACHINE running armel"
+        fi
+    else
+        if [ $MACHINE = "armv7l" ] ; then
+            ARCH="32"
+            SUPPORTED_ARCH=1
+            echo "Detected $MACHINE running armhf"
+        else
+            echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
+        fi
+    fi
 fi
 
 if [ $MACHINE = "x86_64" ] || [ $MACHINE = "amd64" ]; then
