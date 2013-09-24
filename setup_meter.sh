@@ -614,7 +614,7 @@ if [ $MACHINE = "i686" ] ||
 fi
 
 #determine hard vs. soft float using readelf
-if [ "$MACHINE" = "arm"* ] ; then
+if [[ "$MACHINE" == arm* ]] ; then
 	if [ -x /usr/bin/readelf ] ; then
 		HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
 		if [ -z "$HARDFLOAT" ]; then
