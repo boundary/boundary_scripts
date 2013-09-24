@@ -614,26 +614,30 @@ if [ $MACHINE = "i686" ] ||
 fi
 
 #determine hard vs. soft float using readelf
-if [ -x /usr/bin/readelf ] ; then
-    HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
-    if [ -z "$HARDFLOAT" ]; then
-        if [ $MACHINE = "armv7l" ]
-           [ $MACHINE = "armv6l" ] ||
-           [ $MACHINE = "armv5tel" ] ||
-           [ $MACHINE = "armv5tejl" ] ; then
-            ARCH="32"
-            SUPPORTED_ARCH=1
-            echo "Detected $MACHINE running armel"
-        fi
-    else
-        if [ $MACHINE = "armv7l" ] ; then
-            ARCH="32"
-            SUPPORTED_ARCH=1
-            echo "Detected $MACHINE running armhf"
-        else
-            echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
-        fi
-    fi
+if [ "$MACHINE" = "arm"* ] ; then
+	if [ -x /usr/bin/readelf ] ; then
+		HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
+		if [ -z "$HARDFLOAT" ]; then
+			if [ $MACHINE = "armv7l" ] ||
+			   [ $MACHINE = "armv6l" ] ||
+			   [ $MACHINE = "armv5tel" ] ||
+			   [ $MACHINE = "armv5tejl" ] ; then
+				ARCH="32"
+				SUPPORTED_ARCH=1
+				echo "Detected $MACHINE running armel"
+			fi
+		else
+			if [ $MACHINE = "armv7l" ] ; then
+				ARCH="32"
+				SUPPORTED_ARCH=1
+				echo "Detected $MACHINE running armhf"
+			else
+				echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
+			fi
+		fi
+	else
+		echo "Cannot determine ARM ABI, please install the 'binutils' package"
+	fi
 fi
 
 if [ $MACHINE = "x86_64" ] || [ $MACHINE = "amd64" ]; then
