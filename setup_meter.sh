@@ -314,7 +314,7 @@ EOF"
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
       SMARTOS_PKG=$(curl -s http://smartos.boundary.com/$MACHINE/ | grep "a href" | grep bprobe | tail -n1 | cut -d"\"" -f 4)
-			pkg_add https://$SMARTOS/$MACHINE/$SMARTOS_PKG
+      pkg_add http://$SMARTOS/$MACHINE/$SMARTOS_PKG
       return $?
     fi
 }
