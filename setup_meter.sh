@@ -313,11 +313,7 @@ EOF"
         sudo $YUM_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
-      grep "http://${SMARTOS}/${MACHINE}" /opt/local/etc/pkgin/repositories.conf > /dev/null
-
-      if [ "$?" = "1" ]; then
-        echo "http://${SMARTOS}/${MACHINE}/" >> /opt/local/etc/pkgin/repositories.conf
-      fi
+      SMARTOS_PKG=$(curl -s http://smartos.boundary.com/$MACHINE/ | grep "a href" | grep bprobe | tail -n1 | cut -d"\"" -f 4)
 
       pkgin -fy up
       pkgin -y install bprobe
