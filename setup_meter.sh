@@ -565,7 +565,7 @@ else
       DISTRO="SmartOS"
       MACHINE="i386"
       VERSION=13
-      if [ -x /etc/product ]; then
+      if [ -f /etc/product ]; then
         grep "base64" /etc/product > /dev/null
         if [ "$?" = "0" ]; then
             MACHINE="x86_64"
