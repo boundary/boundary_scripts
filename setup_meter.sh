@@ -314,7 +314,7 @@ EOF"
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
       SMARTOS_PKG=$(curl -s http://smartos.boundary.com/$MACHINE/ | grep "a href" | grep bprobe | tail -n1 | cut -d"\"" -f 4)
-      pkg_add -v http://$SMARTOS/$MACHINE/$SMARTOS_PKG
+      pkg_add -f -v http://$SMARTOS/$MACHINE/$SMARTOS_PKG
       svccfg import /opt/custom/smf/boundary-meter.xml
       svcadm enable boundary/meter
       return $?
