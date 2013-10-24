@@ -105,31 +105,44 @@ status_msgs = meter_status['insert'].map do |entry|
   meter_status['schema'].zip(entry) do |field,value|
     status_msg[field] = value
   end
+  meter = meters[status_msg["observation_domain_id"]]
+  if !meter.nil?
+    meter['last_seen'] = Time.at(status_msg['epochMillis'] / 1000)
+  end
   status_msg
 end
 
 millis_ago = seconds_ago(opts[:since]) * 1000
 since = Time.now.to_i * 1000 - millis_ago
 
-disconnected_since = status_msgs.select do |msg|
-  msg["connected"] == false && msg["epochMillis"] < since && !meters[msg["observationDomainId"].to_s].nil?
+is_connected = status_msgs.select do |msg|
+  msg["connected"] == true
 end
 
-disconnected_since.each do |msg|
-  m = meters[msg["observationDomainId"].to_s]
-  next if m.nil?
-  mId = m["id"]
-  date = Time.at(msg['epochMillis'] / 1000)
-  msg["id"] = mId
-  puts "#{m['os_node_name']} - last seen #{date} - https://api.boundary.com/#{opts[:orgid]}/meters/#{mId}"
+connected_since = status_msgs.select do |msg|
+  !(msg["connected"] == false && msg["epochMillis"] < since)
+end
+
+puts "#{is_connected.length} meters currently connected"
+puts "#{connected_since.length} meters connected since #{Time.at(since/1000)}"
+
+to_purge = meters.clone
+connected_since.each do |msg|
+  to_purge.delete(msg["observationDomainId"].to_s)
+end
+
+to_purge.each do |obsId,meter|
+  puts "#{meter['name']} - #{meter['last_seen'] or 'unknown'} - https://api.boundary.com/#{opts[:orgid]}/meters/#{meter['id']}"
 end
 
 exit unless opts[:delete]
+
+puts "deleting #{to_purge.length} meters!"
 
 if !opts[:force]
   exit unless yesno("Are you sure you want to delete these meters?", false)
 end
 
-disconnected_since.each do |msg|
-  delete(opts[:orgid], opts[:apikey], "meters/#{msg['id']}")
+to_purge.each do |obsId,meter|
+  delete(opts[:orgid], opts[:apikey], "meters/#{meter['id']}")
 end
