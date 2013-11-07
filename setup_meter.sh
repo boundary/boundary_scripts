@@ -245,39 +245,39 @@ function create_meter() {
 function do_install() {
     if [ "$DISTRO" = "Ubuntu" ]; then
         echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
+        $SUDO $APT_CMD update > /dev/null
 
         APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
         echo "Adding repository $APT_STRING"
-        sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+        $SUDO sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | $SUDO apt-key add -
         if [ $? -gt 0 ]; then
             echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
         echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
-        sudo $APT_CMD install bprobe
+        $SUDO $APT_CMD update > /dev/null
+        $SUDO $APT_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "Debian" ]; then
         echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
+        $SUDO $APT_CMD update > /dev/null
 
         APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
         echo "Adding repository $APT_STRING"
-        sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+        $SUDO sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | $SUDO apt-key add -
         if [ $? -gt 0 ]; then
             echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
         echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
-        sudo $APT_CMD install bprobe
+        $SUDO $APT_CMD update > /dev/null
+        $SUDO $APT_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
         GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
@@ -295,7 +295,7 @@ function do_install() {
 
         echo "Adding repository http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR"
 
-        sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
+        $SUDO sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
 [boundary]
 name=boundary
 baseurl=http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR
@@ -304,13 +304,13 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
+        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | $SUDO tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
         if [ $? -gt 0 ]; then
             echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
             exit 1
         fi
 
-        sudo $YUM_CMD install bprobe
+        $SUDO $YUM_CMD install bprobe
         return $?
     elif [ "$DISTRO" = "SmartOS" ]; then
       grep "http://${SMARTOS}/${MACHINE}" /opt/local/etc/pkgin/repositories.conf > /dev/null
@@ -337,7 +337,7 @@ function setup_cert_key() {
         if [ $DISTRO = "SmartOS" ]; then
             mkdir $TARGET_DIR
         else
-            sudo mkdir $TARGET_DIR
+            $SUDO mkdir $TARGET_DIR
         fi
     fi
 
@@ -349,7 +349,7 @@ function setup_cert_key() {
         if [ $DISTRO = "SmartOS" ]; then
             $CURL -s -u $1: $2/key.pem | tee $TARGET_DIR/key.pem > /dev/null
         else
-            $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
+            $CURL -s -u $1: $2/key.pem | $SUDO tee $TARGET_DIR/key.pem > /dev/null
         fi
 
         if [ $? -gt 0 ]; then
@@ -360,7 +360,7 @@ function setup_cert_key() {
         if [ $DISTRO = "SmartOS" ]; then
             chmod 600 $TARGET_DIR/key.pem
         else
-            sudo chmod 600 $TARGET_DIR/key.pem
+            $SUDO chmod 600 $TARGET_DIR/key.pem
         fi
     fi
 
@@ -372,7 +372,7 @@ function setup_cert_key() {
         if [ $DISTRO = "SmartOS" ]; then
             $CURL -s -u $1: $2/cert.pem | tee $TARGET_DIR/cert.pem > /dev/null
         else
-            $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
+            $CURL -s -u $1: $2/cert.pem | $SUDO tee $TARGET_DIR/cert.pem > /dev/null
         fi
 
         if [ $? -gt 0 ]; then
@@ -383,7 +383,7 @@ function setup_cert_key() {
         if [ $DISTRO = "SmartOS" ]; then
             chmod 600 $TARGET_DIR/cert.pem
         else
-            sudo chmod 600 $TARGET_DIR/cert.pem
+            $SUDO chmod 600 $TARGET_DIR/cert.pem
         fi
     fi
 }
@@ -460,11 +460,14 @@ function ec2_tag() {
 }
 
 function pre_install_sanity() {
-    SUDO=`which sudo`
-    if [ $? -ne 0 ]; then
-        echo "This script requires that sudo be installed and configured for your user."
-        echo "Please install sudo. For assistance, support@boundary.com"
-        exit 1
+    # If this script is being run by root for some reason, don't use sudo.
+    if [ "$(id -u)" != "0" ]; then
+        SUDO=`which sudo`
+        if [ $? -ne 0 ]; then
+            echo "This script requires that sudo be installed and configured for your user."
+            echo "Please install sudo. For assistance, support@boundary.com"
+            exit 1
+        fi
     fi
 
     if [ $DISTRO = "SmartOS" ]; then
@@ -480,16 +483,16 @@ function pre_install_sanity() {
 
             if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
                 echo "Updating apt repository cache..."
-                sudo $APT_CMD update > /dev/null
-                sudo $APT_CMD install curl
+                $SUDO $APT_CMD update > /dev/null
+                $SUDO $APT_CMD install curl
 
             elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
                 if [ $MACHINE = "i686" ]; then
-                    sudo $YUM_CMD install curl.i686
+                    $SUDO $YUM_CMD install curl.i686
                 fi
 
                 if [ $MACHINE = "x86_64" ]; then
-                    sudo $YUM_CMD install curl.x86_64
+                    $SUDO $YUM_CMD install curl.x86_64
                 fi
             fi
         else
@@ -511,9 +514,9 @@ function pre_install_sanity() {
 
             if [ $DEPS = "true" ]; then
                 echo "Updating apt repository cache..."
-                sudo $APT_CMD update > /dev/null
+                $SUDO $APT_CMD update > /dev/null
                 echo "Installing apt-transport-https ..."
-                sudo $APT_CMD install apt-transport-https
+                $SUDO $APT_CMD install apt-transport-https
             else
                 echo "To automatically install required components for Meter Install, rerun $0 with -d flag."
                 exit 1
