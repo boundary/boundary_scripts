@@ -1,5 +1,7 @@
+#!/bin/bash
+
 ###
-### Copyright 2011, Boundary
+### Copyright 2013, Boundary
 ###
 ### Licensed under the Apache License, Version 2.0 (the "License");
 ### you may not use this file except in compliance with the License.
@@ -14,27 +16,36 @@
 ### limitations under the License.
 ###
 
-#!/bin/bash
-
 APIHOST="api.boundary.com"
 APICREDS=
 
-function print_help() {
-  echo "./create_event.sh -i ORGID -a APIKEY"
+print_help() {
+  echo "./create_event -i ORGID -a APIKEY"
   exit 0
 }
 
-function create_event() {
-
+create_event() {
+    set -x
+    PAYLOAD=$(cat <<EOF
+{
+    "title": "example",
+    "message": "test",
+    "tags": ["example", "test", "stuff"],
+    "fingerprintFields": ["@title"],
+    "source": {
+        "ref": "myhost",
+        "type": "host"
+    }
+}
+EOF
+)
   local LOCATION=`curl -is -X POST -H "Content-Type: application/json" \
-  -d '{ "severity":"ERROR", "status":"OPEN","source":{"ref":"sample","type":"meter","name":"samplesource"} \
-  , "sender":{"ref":"sample","type":"samplescript","name":"create_event.sh"} \
-  , "properties":{ "eventKey":"123423" }, "tags":["example","test","stuff"],"title": "sample event" \
-  , "message":"details of the event","fingerprintFields":["eventKey"] }' \
-  -u "$1:" $2 \
+  -d "$PAYLOAD" \
+  -u "$1:" $2  \
         | grep Location \
         | sed 's/Location: //' \
         | sed 's/\(.*\)./\1/'`
+
   echo $LOCATION
 }
 
@@ -53,10 +64,12 @@ if [ ! -z $APIID ]
     if [ ! -z $APIKEY ]
       then
         URL="https://$APIHOST/$APIID/events"
-        EVENT_LOCATION=`create_event $APIKEY $URL`
-        if [ ! -z $EVENT_LOCATION ]
+
+        LOCATION=`create_event $APIKEY $URL`
+
+        if [ ! -z $LOCATION ]
           then
-            echo "An event was created at $EVENT_LOCATION"
+            echo "An event was created at $LOCATION"
           else
             echo "No location header received, error creating event!"
             exit 1
