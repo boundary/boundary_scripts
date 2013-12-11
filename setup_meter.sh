@@ -585,12 +585,26 @@ fi
 echo "Detected $DISTRO $VERSION..."
 echo ""
 
-while getopts "hdsi:" opts; do
+while getopts "hdsi:f:" opts; do
     case $opts in
         h) print_help;;
         d) DEPS="true";;
         s) STAGING="true";;
         i) APICREDS="$OPTARG";;
+        f) echo "WARNING! You are OVERRIDING this script's OS detection."
+           echo "On unsupported platforms, your mileage may vary!"
+           print_supported_platforms
+           echo "Please contact support@boundary.com to request support for your architecture."
+
+           # This takes input basically of the form "OS VERSION" for the OS
+           # you're mimicking.
+           # E.g., "CentOS 6.2", "Ubuntu 11.10", etc.
+           PLATFORM="$OPTARG"
+           DISTRO=`echo $PLATFORM | awk '{print $1}'`
+           VERSION=`echo $PLATFORM | awk '{print $2}'`
+
+           echo "Script will masquerade as \"$PLATFORM\""
+           ;;
         [?]) print_help;;
     esac
 done
