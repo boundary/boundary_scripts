@@ -529,17 +529,23 @@ function pre_install_sanity() {
 if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
     DISTRO=`echo $PLATFORM | awk '{print $1}'`
-    if [ "$DISTRO" != "CentOS" ]; then
-        if [ "$DISTRO" = "Red" ]; then
+    if [ "$DISTRO" = "Fedora" ]; then
+       echo "Masquerading Fedora as RHEL 6 compatible"
+       DISTRO="RHEL"
+       VERSION="6"
+    else
+       if [ "$DISTRO" != "CentOS" ]; then
+           if [ "$DISTRO" = "Red" ]; then
                 DISTRO="RHEL"
                 VERSION=`echo $PLATFORM | awk '{print $7}'`
-        else
+           else
                 DISTRO="unknown"
                 PLATFORM="unknown"
                 VERSION="unknown"
-        fi
-    elif [ "$DISTRO" = "CentOS" ]; then
-        VERSION=`echo $PLATFORM | awk '{print $3}'`
+           fi
+       elif [ "$DISTRO" = "CentOS" ]; then
+           VERSION=`echo $PLATFORM | awk '{print $3}'`
+       fi
     fi
     MACHINE=`uname -m`
 elif [ -f /etc/system-release ]; then
