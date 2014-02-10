@@ -17,7 +17,7 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -28,6 +28,7 @@ CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
+openSUSE_VERSIONS=("12.1" "12.3" "13.1")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -161,67 +162,40 @@ function check_distro_version() {
 
     TEMP="\${${DISTRO}_versions[*]}"
     VERSIONS=`eval echo $TEMP`
+    VERSION_CMP=
 
     if [ $DISTRO = "Ubuntu" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-        PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$MAJOR_VERSION.$MINOR_VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
+        VERSION_CMP=$MAJOR_VERSION.$MINOR_VERSION
 
     elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$MAJOR_VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
+        VERSION_CMP=$MAJOR_VERSION
 
     elif [ $DISTRO = "Amazon" ]; then
         VERSION=`echo $PLATFORM | awk '{print $5}'`
         # Some of these include minor numbers. Trim.
-        VERSION=${VERSION:0:7}
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
+        VERSION_CMP=${VERSION:0:7}
 
     elif [ $DISTRO = "Debian" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+        VERSION_CMP=$MAJOR_VERSION
 
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$MAJOR_VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
+    elif [ $DISTRO = "openSUSE" ]; then
+        VERSION_CMP=$VERSION
 
     elif [ $DISTRO = "SmartOS" ]; then
-        # SmartOS does not have version numbers
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
+        VERSION_CMP=$VERSION
     fi
+
+    TEMP="\${${DISTRO}_VERSIONS[*]}"
+    VERSIONS=`eval echo $TEMP`
+    for v in $VERSIONS ; do
+        if [ "$VERSION" = "$v" ]; then
+            return 0
+        fi
+    done
 
     echo "Detected $DISTRO but with an unsupported version ($VERSION)"
     return 1
@@ -252,6 +226,22 @@ function do_install() {
         echo "Updating apt repository cache..."
         $SUDO $APT_CMD update > /dev/null
         $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" $APT_CMD install bprobe
+        return $?
+
+    elif [ "$DISTRO" = "openSUSE" ]; then
+        ARCH_STR="x86_64/"
+
+        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary > RPM-GPG-KEY-Boundary
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+            exit 1
+        fi
+        $SUDO rpm --import ./RPM-GPG-KEY-Boundary
+
+        echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
+        $SUDO zypper addrepo -c -k -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
+
+        $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" zypper install -y bprobe
         return $?
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
@@ -397,6 +387,12 @@ elif [ -f /etc/debian_version ] ; then
     VERSION=`cat /etc/debian_version`
     INFO="$DISTRO $VERSION"
     PLATFORM=$INFO
+    MACHINE=`uname -m`
+elif [ -f /etc/os-release ] ; then
+    . /etc/os-release
+    PLATFORM=$PRETTY_NAME
+    DISTRO=$NAME
+    VERSION=$VERSION_ID
     MACHINE=`uname -m`
 else
     PLATFORM=`uname -sv | grep 'SunOS joyent'` > /dev/null
