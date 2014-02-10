@@ -56,6 +56,8 @@ APIHOST="api.boundary.com"
 APICREDS=
 TARGET_DIR="/etc/bprobe"
 
+METERTAGS=
+
 SUPPORTED_ARCH=0
 SUPPORTED_PLATFORM=0
 
@@ -87,6 +89,16 @@ function print_supported_platforms() {
 
 EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
 EC2_TAGS="instance-type placement/availability-zone"
+EC2_DESC_TAGS=
+which euca-describe-tags > /dev/null
+if [ $? -eq 0 ]; then
+    EC2_DESC_TAGS=euca-describe-tags
+else
+    which ec2-describe-tags > /dev/null
+    if [ $? -eq 0 ]; then
+	    EC2_DESC_TAGS=ec2-describe-tags
+    fi
+fi
 
 function ec2_find_tags() {
     echo -n "Checking this is an ec2 environment..."
@@ -133,6 +145,12 @@ function ec2_find_tags() {
         done
     done
 
+    # extract additional tags if the commands and access variables are set
+    if [ -n "$EC2_DESC_TAGS" -a -n "$EC2_ACCESS_KEY" -a -n "$EC2_SECRET_KEY" -a -n "$EC2_URL" ]; then
+        for an_tag in `${EC2_DESC_TAGS} --filter "resource-id=\`curl -s http://169.254.169.254/latest/meta-data/instance-id\`" | grep -v Name | sed 's/[ \t]/ /g' | cut -d " " -f 5-`; do
+            METERTAGS=$METERTAGS,$an_tag
+        done
+    fi
     echo Discovered ec2 tags: $METERTAGS
 }
 
