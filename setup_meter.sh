@@ -91,11 +91,11 @@ function print_supported_platforms() {
 EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
 EC2_TAGS="instance-type placement/availability-zone"
 EC2_DESC_TAGS=
-which euca-describe-tags > /dev/null
+which euca-describe-tags > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     EC2_DESC_TAGS=euca-describe-tags
 else
-    which ec2-describe-tags > /dev/null
+    which ec2-describe-tags > /dev/null 2>&1
     if [ $? -eq 0 ]; then
 	    EC2_DESC_TAGS=ec2-describe-tags
     fi
@@ -192,7 +192,7 @@ function check_distro_version() {
     TEMP="\${${DISTRO}_VERSIONS[*]}"
     VERSIONS=`eval echo $TEMP`
     for v in $VERSIONS ; do
-        if [ "$VERSION" = "$v" ]; then
+        if [ "$VERSION_CMP" = "$v" ]; then
             return 0
         fi
     done
@@ -202,7 +202,7 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "   $0 [-d] -i ORGID:APIKEY"
+    echo "   $0 [-d] [-s] -i ORGID:APIKEY"
     echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
     echo "          in the Account Settings in the Boundary WebUI."
     exit 0
