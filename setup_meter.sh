@@ -17,7 +17,7 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -29,6 +29,7 @@ Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
+FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 8.4-RELEASE 9.0-RELEASE 9.1-RELEASE 9.2-RELEASE")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -65,6 +66,7 @@ SUPPORTED_PLATFORM=0
 APT="apt.boundary.com"
 YUM="yum.boundary.com"
 SMARTOS="smartos.boundary.com"
+FREEBSD="freebsd.boundary.com"
 
 APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
@@ -182,10 +184,7 @@ function check_distro_version() {
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
 
-    elif [ $DISTRO = "openSUSE" ]; then
-        VERSION_CMP=$VERSION
-
-    elif [ $DISTRO = "SmartOS" ]; then
+	else
         VERSION_CMP=$VERSION
     fi
 
@@ -290,6 +289,10 @@ EOF"
       svccfg import /opt/custom/smf/boundary-meter.xml
       svcadm enable boundary/meter
       return $?
+
+    elif [ "$DISTRO" = "FreeBSD" ]; then
+        fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
+        $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" pkg_add bprobe-current.tgz
     fi
 }
 
@@ -325,6 +328,9 @@ function pre_install_sanity() {
 			if [ $MACHINE = "x86_64" ]; then
 				$SUDO $YUM_CMD install curl.x86_64
 			fi
+
+		elif [ $DISTRO = "FreeBSD" ]; then
+			$SUDO pkg_add -r curl
 		fi
     fi
 
@@ -409,9 +415,17 @@ else
         VERSION=`grep 'Image' /etc/product | awk '{ print $3}' | awk -F. '{print $1}'`
       fi
     elif [ "$?" != "0" ]; then
-        PLATFORM="unknown"
-        DISTRO="unknown"
-        MACHINE=`uname -m`
+        uname -sv | grep 'FreeBSD' > /dev/null
+        if [ "$?" = "0" ]; then
+            PLATFORM="FreeBSD"
+            DISTRO="FreeBSD"
+            VERSION=`uname -sv | awk ' { print $3 } '`
+            MACHINE=`uname -m`
+        else
+            PLATFORM="unknown"
+            DISTRO="unknown"
+            MACHINE=`uname -m`
+        fi
     fi
 fi
 
@@ -444,6 +458,7 @@ if [ $STAGING = "true" ]; then
     APT="apt-staging.boundary.com"
     YUM="yum-staging.boundary.com"
     SMARTOS="smartos-staging.boundary.com"
+    FREEBSD="freebsd-staging.boundary.com"
 fi
 
 if [ -z $APICREDS ]; then
