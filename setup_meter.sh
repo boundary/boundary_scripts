@@ -208,6 +208,12 @@ function print_help() {
 }
 
 function do_install() {
+    export INSTALLTOKEN="${APICREDS}"
+    export PROVISIONTAGS="${METERTAGS}"
+    SUDO_ENV=
+    if [ "${SUDO}x" != "x" ]; then
+        SUDO_ENV="$SUDO INSTALLTOKEN=${APICREDS} PROVISIONTAGS=${METERTAGS}"
+    fi
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
 		APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
 		if [ "$DISTRO" = "Debian" ]; then
@@ -224,7 +230,7 @@ function do_install() {
 
         echo "Updating apt repository cache..."
         $SUDO $APT_CMD update > /dev/null
-        $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" $APT_CMD install bprobe
+        $SUDO_ENV $APT_CMD install bprobe
         return $?
 
     elif [ "$DISTRO" = "openSUSE" ]; then
@@ -240,7 +246,7 @@ function do_install() {
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
         $SUDO zypper addrepo -c -k -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
 
-        $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" zypper install -y bprobe
+        $SUDO_ENV zypper install -y bprobe
         return $?
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
@@ -274,7 +280,7 @@ EOF"
             exit 1
         fi
 
-        $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" $YUM_CMD install bprobe
+        $SUDO_ENV $YUM_CMD install bprobe
         return $?
 
     elif [ "$DISTRO" = "SmartOS" ]; then
@@ -285,14 +291,14 @@ EOF"
       fi
 
       pkgin -fy up
-      INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" pkgin -y install bprobe
+      pkgin -y install bprobe
       svccfg import /opt/custom/smf/boundary-meter.xml
       svcadm enable boundary/meter
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
         fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
-        $SUDO INSTALLTOKEN="${APICREDS}" PROVISIONTAGS="${METERTAGS}" pkg_add bprobe-current.tgz
+        $SUDO_ENV pkg_add bprobe-current.tgz
     fi
 }
 
