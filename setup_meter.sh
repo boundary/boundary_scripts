@@ -17,7 +17,7 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -393,6 +393,11 @@ elif [ -f /etc/lsb-release ] ; then
     DISTRO=$DISTRIB_ID
     VERSION=$DISTRIB_RELEASE
     MACHINE=`uname -m`
+    if [ "$DISTRO" = "LinuxMint" ]; then
+       echo "Masquerading Ubuntu LTS compatible"
+       DISTRO="Ubuntu"
+       VERSION="12.04"
+    fi
 elif [ -f /etc/debian_version ] ; then
     #Debian Version /etc/debian_version - Source: http://www.debian.org/doc/manuals/debian-faq/ch-software.en.html#s-isitdebian
     DISTRO="Debian"
