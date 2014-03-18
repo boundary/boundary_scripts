@@ -30,6 +30,7 @@ RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
 FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 8.4-RELEASE 9.0-RELEASE 9.1-RELEASE 9.2-RELEASE")
+LinuxMint_VERSIONS=("13", "14", "15", "16")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -76,7 +77,8 @@ STAGING="false"
 trap "exit" INT TERM EXIT
 
 function print_supported_platforms() {
-    echo "Supported platforms are:"
+	echo
+    echo "Supported platforms by the installation script are:"
     for d in ${PLATFORMS[*]}
     do
         echo -n " * $d:"
@@ -344,23 +346,6 @@ function pre_install_sanity() {
     fi
 }
 
-# If this script is being run by root for some reason, don't use sudo.
-if [ "$(id -u)" != "0" ]; then
-	SUDO=`which sudo`
-	if [ $? -ne 0 ]; then
-		echo "This script must be executed as the 'root' user or with sudo"
-		echo "in order to install the Boundary meter."
-		echo
-		echo "Please install sudo or run again as the 'root' user."
-		echo "For assistance, support@boundary.com"
-		exit 1
-	else
-		sudo -E $0 $@
-		exit 0
-	fi
-fi
-
-
 # Grab some system information
 if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
@@ -433,12 +418,16 @@ else
         if [ "$?" = "0" ]; then
             PLATFORM="FreeBSD"
             DISTRO="FreeBSD"
-            VERSION=`uname -sv | awk ' { print $3 } '`
+            VERSION=`uname -r`
             MACHINE=`uname -m`
         else
-            PLATFORM="unknown"
-            DISTRO="unknown"
-            MACHINE=`uname -m`
+            uname -sv | grep 'Darwin' > /dev/null
+            if [ "$?" = "0" ]; then
+                PLATFORM="Darwin"
+                DISTRO="OS X"
+                VERSION=`uname -r`
+                MACHINE=`uname -m`
+            fi
         fi
     fi
 fi
@@ -474,14 +463,6 @@ if [ $STAGING = "true" ]; then
     SMARTOS="smartos-staging.boundary.com"
     FREEBSD="freebsd-staging.boundary.com"
 fi
-
-if [ -z $APICREDS ]; then
-    print_help
-fi
-
-
-APIID=`echo $APICREDS | awk -F: '{print $1}'`
-APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 
 if [ $MACHINE = "i686" ] ||
    [ $MACHINE = "i586" ] ||
@@ -531,15 +512,36 @@ fi
 
 # Check the distribution
 for d in ${PLATFORMS[*]} ; do
-    if [ $DISTRO = $d ]; then
+    if [ "$DISTRO" = "$d" ]; then
         SUPPORTED_PLATFORM=1
         break
     fi
 done
 if [ $SUPPORTED_PLATFORM -eq 0 ]; then
-    echo "Your platform is not supported."
+    echo "Your platform is not supported by this script at this time."
+	echo "Please check https://app.boundary.com/docs/meter_install for alternate installation instructions."
     print_supported_platforms
-    exit 0
+    exit 1
+fi
+
+if [ -z $APICREDS ]; then
+    print_help
+fi
+
+# If this script is being run by root for some reason, don't use sudo.
+if [ "$(id -u)" != "0" ]; then
+	SUDO=`which sudo`
+	if [ $? -ne 0 ]; then
+		echo "This script must be executed as the 'root' user or with sudo"
+		echo "in order to install the Boundary meter."
+		echo
+		echo "Please install sudo or run again as the 'root' user."
+		echo "For assistance, support@boundary.com"
+		exit 1
+	else
+		sudo -E $0 $@
+		exit 0
+	fi
 fi
 
 # Check the version number
