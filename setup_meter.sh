@@ -210,27 +210,23 @@ function print_help() {
 function do_install() {
     export INSTALLTOKEN="${APICREDS}"
     export PROVISIONTAGS="${METERTAGS}"
-    SUDO_ENV=
-    if [ "${SUDO}x" != "x" ]; then
-        SUDO_ENV="$SUDO INSTALLTOKEN=${APICREDS} PROVISIONTAGS=${METERTAGS}"
-    fi
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
 		APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
 		if [ "$DISTRO" = "Debian" ]; then
 			APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
 		fi
         echo "Adding repository $APT_STRING"
-        $SUDO sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+        sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | $SUDO apt-key add -
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | apt-key add -
         if [ $? -gt 0 ]; then
             echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
             exit 1
         fi
 
         echo "Updating apt repository cache..."
-        $SUDO $APT_CMD update > /dev/null
-        $SUDO_ENV $APT_CMD install bprobe
+        $APT_CMD update > /dev/null
+        $APT_CMD install bprobe
         return $?
 
     elif [ "$DISTRO" = "openSUSE" ]; then
@@ -241,12 +237,12 @@ function do_install() {
             echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
             exit 1
         fi
-        $SUDO rpm --import ./RPM-GPG-KEY-Boundary
+        rpm --import ./RPM-GPG-KEY-Boundary
 
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
-        $SUDO zypper addrepo -c -k -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
+        zypper addrepo -c -k -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
 
-        $SUDO_ENV zypper install -y bprobe
+        zypper install -y bprobe
         return $?
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
@@ -265,7 +261,7 @@ function do_install() {
 
         echo "Adding repository http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR"
 
-        $SUDO sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
+        sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
 [boundary]
 name=boundary
 baseurl=http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR
@@ -274,13 +270,13 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | $SUDO tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
+        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
         if [ $? -gt 0 ]; then
             echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
             exit 1
         fi
 
-        $SUDO_ENV $YUM_CMD install bprobe
+        $YUM_CMD install bprobe
         return $?
 
     elif [ "$DISTRO" = "SmartOS" ]; then
@@ -298,21 +294,11 @@ EOF"
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
         fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
-        $SUDO_ENV pkg_add bprobe-current.tgz
+        pkg_add bprobe-current.tgz
     fi
 }
 
 function pre_install_sanity() {
-    # If this script is being run by root for some reason, don't use sudo.
-    if [ "$(id -u)" != "0" ]; then
-        SUDO=`which sudo`
-        if [ $? -ne 0 ]; then
-            echo "This script requires that sudo be installed and configured for your user."
-            echo "Please install sudo. For assistance, support@boundary.com"
-            exit 1
-        fi
-    fi
-
     if [ $DISTRO = "SmartOS" ]; then
       TARGET_DIR="/opt/local/etc/bprobe"
     fi
@@ -323,20 +309,20 @@ function pre_install_sanity() {
 
 		if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
 			echo "Updating apt repository cache..."
-			$SUDO $APT_CMD update > /dev/null
-			$SUDO $APT_CMD install curl
+			$APT_CMD update > /dev/null
+			$APT_CMD install curl
 
 		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
 			if [ $MACHINE = "i686" ]; then
-				$SUDO $YUM_CMD install curl.i686
+				$YUM_CMD install curl.i686
 			fi
 
 			if [ $MACHINE = "x86_64" ]; then
-				$SUDO $YUM_CMD install curl.x86_64
+				$YUM_CMD install curl.x86_64
 			fi
 
 		elif [ $DISTRO = "FreeBSD" ]; then
-			$SUDO pkg_add -r curl
+			pkg_add -r curl
 		fi
     fi
 
@@ -351,12 +337,29 @@ function pre_install_sanity() {
         if [ $? -gt 0 ];then
             echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
 			echo "Updating apt repository cache..."
-			$SUDO $APT_CMD update > /dev/null
+			$APT_CMD update > /dev/null
 			echo "Installing apt-transport-https ..."
-			$SUDO $APT_CMD install apt-transport-https
+			$APT_CMD install apt-transport-https
         fi
     fi
 }
+
+# If this script is being run by root for some reason, don't use sudo.
+if [ "$(id -u)" != "0" ]; then
+	SUDO=`which sudo`
+	if [ $? -ne 0 ]; then
+		echo "This script must be executed as the 'root' user or with sudo"
+		echo "in order to install the Boundary meter."
+		echo
+		echo "Please install sudo or run again as the 'root' user."
+		echo "For assistance, support@boundary.com"
+		exit 1
+	else
+		sudo -E $0 $@
+		exit 0
+	fi
+fi
+
 
 # Grab some system information
 if [ -f /etc/redhat-release ] ; then
