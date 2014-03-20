@@ -351,7 +351,6 @@ if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
     DISTRO=`echo $PLATFORM | awk '{print $1}'`
     if [ "$DISTRO" = "Fedora" ]; then
-       echo "Masquerading Fedora as RHEL 6 compatible"
        DISTRO="RHEL"
        VERSION="6"
     else
@@ -382,7 +381,6 @@ elif [ -f /etc/lsb-release ] ; then
     VERSION=$DISTRIB_RELEASE
     MACHINE=`uname -m`
     if [ "$DISTRO" = "LinuxMint" ]; then
-       echo "Masquerading Ubuntu LTS compatible"
        DISTRO="Ubuntu"
        VERSION="12.04"
     fi
@@ -431,8 +429,6 @@ else
         fi
     fi
 fi
-
-echo "Detected $DISTRO $VERSION..."
 
 while getopts "hdsi:f:" opts; do
     case $opts in
@@ -524,6 +520,17 @@ if [ $SUPPORTED_PLATFORM -eq 0 ]; then
     exit 1
 fi
 
+
+APIID=`echo $APICREDS | awk -F: '{print $1}'`
+APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
+if [ "${#APIID}" -lt 10 -o "${#APIKEY}" -lt 10 ]; then
+	echo "Please enter a valid installation token"
+	echo "Expected APIID:APIKEY, got: '${APICREDS}'"
+	echo
+
+	print_help
+fi
+
 if [ -z $APICREDS ]; then
     print_help
 fi
@@ -543,6 +550,8 @@ if [ "$(id -u)" != "0" ]; then
 		exit 0
 	fi
 fi
+
+echo "Detected $DISTRO $VERSION..."
 
 # Check the version number
 UNSUPPORTED_RELEASE=0
