@@ -203,9 +203,10 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "   $0 [-d] [-s] -i ORGID:APIKEY"
+    echo "   $0 [-s] -i ORGID:APIKEY"
     echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
     echo "          in the Account Settings in the Boundary WebUI."
+    echo "      -s: Install the latest testing meter from the staging repositories"
     exit 0
 }
 
