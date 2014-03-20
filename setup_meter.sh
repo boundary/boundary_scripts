@@ -242,7 +242,7 @@ function do_install() {
         rpm --import ./RPM-GPG-KEY-Boundary
 
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
-        zypper addrepo -c -k -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
+        zypper addrepo -c -k -f -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
 
         zypper install -y bprobe
         return $?
