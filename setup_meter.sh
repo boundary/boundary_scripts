@@ -17,7 +17,7 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -31,6 +31,7 @@ SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
 FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 8.4-RELEASE 9.0-RELEASE 9.1-RELEASE 9.2-RELEASE")
 LinuxMint_VERSIONS=("13", "14", "15", "16")
+Gentoo_VERSIONS=("1.12.11.1")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -69,6 +70,7 @@ APT="apt.boundary.com"
 YUM="yum.boundary.com"
 SMARTOS="smartos.boundary.com"
 FREEBSD="freebsd.boundary.com"
+GENTOO="gentoo.boundary.com"
 
 APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
@@ -186,7 +188,6 @@ function check_distro_version() {
     elif [ $DISTRO = "Debian" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
-
 	else
         VERSION_CMP=$VERSION
     fi
@@ -199,7 +200,7 @@ function check_distro_version() {
         fi
     done
 
-    echo "Detected $DISTRO but with an unsupported version ($VERSION)"
+    echo "Detected $DISTRO but with an untested version ($VERSION)"
     return 1
 }
 
@@ -251,9 +252,9 @@ function do_install() {
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
         GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
-        if [ $MACHINE = "i686" ]; then
+        if [ "$MACHINE" = "i686" ]; then
             ARCH_STR="i386/"
-        elif [ $MACHINE = "x86_64" ]; then
+        elif [ "$MACHINE" = "x86_64" ]; then
             ARCH_STR="x86_64/"
         fi
 
@@ -299,6 +300,22 @@ EOF"
     elif [ "$DISTRO" = "FreeBSD" ]; then
         fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
         pkg_add bprobe-current.tgz
+    elif [ "$DISTRO" = "Gentoo" ]; then
+        if [ -e bprobe ]; then
+	    echo
+            echo "The installation script needs to create a 'bprobe' directory in the current"
+	    echo "working directory for installation to proceed. Please run this script from"
+	    echo "another location or remove the currently-existing 'bprobe' file or directory"
+	    echo "and try again."
+	    echo
+            return 1
+        fi
+        mkdir bprobe
+        (cd bprobe;
+         wget "http://${GENTOO}/engineyard/latest"
+         wget "http://${GENTOO}/engineyard/`cat latest`")
+        ebuild --skip-manifest bprobe/`cat bprobe/latest` merge
+        rm -fr bprobe
     fi
 }
 
@@ -317,11 +334,11 @@ function pre_install_sanity() {
 			$APT_CMD install curl
 
 		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
-			if [ $MACHINE = "i686" ]; then
+			if [ "$MACHINE" = "i686" ]; then
 				$YUM_CMD install curl.i686
 			fi
 
-			if [ $MACHINE = "x86_64" ]; then
+			if [ "$MACHINE" = "x86_64" ]; then
 				$YUM_CMD install curl.x86_64
 			fi
 
@@ -399,6 +416,11 @@ elif [ -f /etc/os-release ] ; then
     DISTRO=$NAME
     VERSION=$VERSION_ID
     MACHINE=`uname -m`
+elif [ -f /etc/gentoo-release ] ; then
+    PLATFORM="Gentoo"
+    DISTRO="Gentoo"
+    VERSION=`cat /etc/gentoo-release | cut -d ' ' -f 5`
+    MACHINE=`uname -m`
 else
     PLATFORM=`uname -sv | grep 'SunOS joyent'` > /dev/null
     if [ "$?" = "0" ]; then
@@ -460,11 +482,12 @@ if [ $STAGING = "true" ]; then
     YUM="yum-staging.boundary.com"
     SMARTOS="smartos-staging.boundary.com"
     FREEBSD="freebsd-staging.boundary.com"
+    GENTOO="gentoo-staging.boundary.com"
 fi
 
-if [ $MACHINE = "i686" ] ||
-   [ $MACHINE = "i586" ] ||
-   [ $MACHINE = "i386" ] ; then
+if [ "$MACHINE" = "i686" ] ||
+   [ "$MACHINE" = "i586" ] ||
+   [ "$MACHINE" = "i386" ] ; then
     ARCH="32"
     SUPPORTED_ARCH=1
 fi
@@ -474,16 +497,16 @@ if [[ "$MACHINE" == arm* ]] ; then
 	if [ -x /usr/bin/readelf ] ; then
 		HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
 		if [ -z "$HARDFLOAT" ]; then
-			if [ $MACHINE = "armv7l" ] ||
-			   [ $MACHINE = "armv6l" ] ||
-			   [ $MACHINE = "armv5tel" ] ||
-			   [ $MACHINE = "armv5tejl" ] ; then
+			if [ "$MACHINE" = "armv7l" ] ||
+			   [ "$MACHINE" = "armv6l" ] ||
+			   [ "$MACHINE" = "armv5tel" ] ||
+			   [ "$MACHINE" = "armv5tejl" ] ; then
 				ARCH="32"
 				SUPPORTED_ARCH=1
 				echo "Detected $MACHINE running armel"
 			fi
 		else
-			if [ $MACHINE = "armv7l" ] ; then
+			if [ "$MACHINE" = "armv7l" ] ; then
 				ARCH="32"
 				SUPPORTED_ARCH=1
 				echo "Detected $MACHINE running armhf"
@@ -496,7 +519,7 @@ if [[ "$MACHINE" == arm* ]] ; then
 	fi
 fi
 
-if [ $MACHINE = "x86_64" ] || [ $MACHINE = "amd64" ]; then
+if [ "$MACHINE" = "x86_64" ] || [ "$MACHINE" = "amd64" ]; then
     ARCH="64"
     SUPPORTED_ARCH=1
 fi
@@ -586,8 +609,8 @@ ec2_find_tags
 do_install
 
 if [ $? -ne 0 ]; then
-    echo "I added the correct repositories, but the meter installation failed."
-    echo "Please contact support@boundary.com about this problem."
+    echo "The meter installation failed."
+    echo "For help, please contact support@boundary.com describing the problem."
     exit 1
 fi
 
