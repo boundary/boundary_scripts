@@ -305,8 +305,8 @@ EOF"
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
-        pkg_add bprobe-current.tgz
+        fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/boundary-meter-current.tgz"
+        pkg_add boundary-meter-current.tgz
     elif [ "$DISTRO" = "Gentoo" ]; then
         if [ -e bprobe ]; then
 	    echo
