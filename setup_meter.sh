@@ -292,7 +292,7 @@ EOF"
       fi
 
       pkgin -fy up
-      pkgin -y install bprobe
+      pkgin -y install boundary-meter
       # Enable promiscuous mode on SmartOS by default.
       # Non-promiscuous mode is not very useful because the OS only forwards
       # received traffic.
