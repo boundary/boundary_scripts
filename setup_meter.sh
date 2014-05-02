@@ -59,7 +59,7 @@ map RHEL 6 Santiago
 
 APIHOST="api.boundary.com"
 APICREDS=
-TARGET_DIR="/etc/bprobe"
+TARGET_DIR="/etc/boundary"
 
 METERTAGS=
 
@@ -308,27 +308,27 @@ EOF"
         fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/boundary-meter-current.tgz"
         pkg_add boundary-meter-current.tgz
     elif [ "$DISTRO" = "Gentoo" ]; then
-        if [ -e bprobe ]; then
+        if [ -e boundary-meter ]; then
 	    echo
-            echo "The installation script needs to create a 'bprobe' directory in the current"
+            echo "The installation script needs to create a 'boundary-meter' directory in the current"
 	    echo "working directory for installation to proceed. Please run this script from"
-	    echo "another location or remove the currently-existing 'bprobe' file or directory"
+	    echo "another location or remove the currently-existing 'boundary-meter' file or directory"
 	    echo "and try again."
 	    echo
             return 1
         fi
-        mkdir bprobe
-        (cd bprobe;
+        mkdir boundary-meter
+        (cd boundary-meter;
          wget "http://${GENTOO}/engineyard/latest"
          wget "http://${GENTOO}/engineyard/`cat latest`")
-        ebuild --skip-manifest bprobe/`cat bprobe/latest` merge
-        rm -fr bprobe
+        ebuild --skip-manifest boundary-meter/`cat boundary-meter/latest` merge
+        rm -fr boundary-meter
     fi
 }
 
 function pre_install_sanity() {
     if [ $DISTRO = "SmartOS" ]; then
-      TARGET_DIR="/opt/local/etc/bprobe"
+      TARGET_DIR="/opt/local/etc/boundary"
     fi
 
     which curl > /dev/null
