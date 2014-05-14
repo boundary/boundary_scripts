@@ -294,9 +294,8 @@ EOF"
       # Enable promiscuous mode on SmartOS by default.
       # Non-promiscuous mode is not very useful because the OS only forwards
       # received traffic.
-      if [ -f /opt/local/etc/bprobe/bprobe.default -a ! -f /opt/local/etc/bprobe/bprobe.defaults ]; then
-          sed -e 's/PCAP_PROMISC=0/PCAP_PROMISC=1/' /opt/local/etc/bprobe/bprobe.default > /opt/local/etc/bprobe/bprobe.defaults
-          rm /opt/local/etc/bprobe/bprobe.default
+      if [ -f /opt/local/etc/boundary/meter.defaults ]; then
+          sed -i -e 's/PCAP_PROMISC=0/PCAP_PROMISC=1/' /opt/local/etc/boundary/meter.defaults
       fi
       svccfg import /opt/custom/smf/boundary-meter.xml
       svcadm enable boundary/meter
