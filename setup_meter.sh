@@ -59,7 +59,6 @@ map RHEL 6 Santiago
 
 APIHOST="api.boundary.com"
 APICREDS=
-TARGET_DIR="/etc/boundary"
 
 METERTAGS=
 
@@ -87,8 +86,7 @@ function print_supported_platforms() {
         echo -n " * $d:"
         foo="\${${d}_VERSIONS[*]}"
         versions=`eval echo $foo`
-        for v in $versions
-        do
+        for v in $versions; do
             echo -n " $v"
         done
         echo ""
@@ -327,10 +325,6 @@ EOF"
 }
 
 function pre_install_sanity() {
-    if [ $DISTRO = "SmartOS" ]; then
-      TARGET_DIR="/opt/local/etc/boundary"
-    fi
-
     which curl > /dev/null
     if [ $? -gt 0 ]; then
 		echo "Installing curl ..."
