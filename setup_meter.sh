@@ -229,7 +229,7 @@ function do_install() {
 
         echo "Updating apt repository cache..."
         $APT_CMD update > /dev/null
-        $APT_CMD install bprobe
+        $APT_CMD install boundary-meter
         return $?
 
     elif [ "$DISTRO" = "openSUSE" ]; then
@@ -245,7 +245,7 @@ function do_install() {
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
         zypper addrepo -c -k -f -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
 
-        zypper install -y bprobe
+        zypper install -y boundary-meter
         return $?
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
@@ -279,7 +279,7 @@ EOF"
             exit 1
         fi
 
-        $YUM_CMD install bprobe
+        $YUM_CMD install boundary-meter
         return $?
 
     elif [ "$DISTRO" = "SmartOS" ]; then
