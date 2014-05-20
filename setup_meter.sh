@@ -29,7 +29,7 @@ Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
-FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 8.4-RELEASE 9.0-RELEASE 9.1-RELEASE 9.2-RELEASE")
+FreeBSD_VERSIONS=("9.0-RELEASE 9.1-RELEASE 9.2-RELEASE 10.0-RELEASE")
 LinuxMint_VERSIONS=("13", "14", "15", "16")
 Gentoo_VERSIONS=("1.12.11.1")
 
@@ -302,8 +302,8 @@ EOF"
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/boundary-meter-current.tgz"
-        pkg_add boundary-meter-current.tgz
+        fetch "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz"
+        pkg add boundary-meter-current.txz
     elif [ "$DISTRO" = "Gentoo" ]; then
         if [ -e boundary-meter ]; then
 	    echo
