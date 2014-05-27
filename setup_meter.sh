@@ -112,6 +112,15 @@ function ec2_find_tags() {
     exit_code=$?
 
     if [ "$exit_code" -eq "0" ]; then
+        # check to see if we *really* are on EC2.
+        # Some Proxies emit false results for non-existent server addresses
+        $CURL -is --connect-timeout 5 "$EC2_INTERNAL" | grep 'Server: EC2ws' > /dev/null
+        exit_code=$?
+
+        if [ "$exit_code" -ne "0" ]; then
+            echo "no."
+            return 0
+        fi
         echo "yes."
         echo "Auto generating ec2 tags for this meter."
     else
