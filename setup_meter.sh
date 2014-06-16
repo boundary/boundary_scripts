@@ -17,7 +17,7 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -32,6 +32,7 @@ openSUSE_VERSIONS=("12.1" "12.3" "13.1")
 FreeBSD_VERSIONS=("9.0-RELEASE 9.1-RELEASE 9.2-RELEASE 10.0-RELEASE")
 LinuxMint_VERSIONS=("13", "14", "15", "16")
 Gentoo_VERSIONS=("1.12.11.1")
+Oracle_VERSIONS=("5" "6")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -183,7 +184,7 @@ function check_distro_version() {
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
         VERSION_CMP=$MAJOR_VERSION.$MINOR_VERSION
 
-    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ]; then
+    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
 
@@ -257,7 +258,7 @@ function do_install() {
         zypper install -y boundary-meter
         return $?
 
-    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
+    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
         GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
         if [ "$MACHINE" = "i686" ]; then
             ARCH_STR="i386/"
@@ -342,7 +343,7 @@ function pre_install_sanity() {
 			$APT_CMD update > /dev/null
 			$APT_CMD install curl
 
-		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
+		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
 			if [ "$MACHINE" = "i686" ]; then
 				$YUM_CMD install curl.i686
 			fi
@@ -383,7 +384,11 @@ if [ -f /etc/redhat-release ] ; then
        VERSION="6"
     else
        if [ "$DISTRO" != "CentOS" ]; then
-           if [ "$DISTRO" = "Red" ]; then
+           if [ "$DISTRO" = "Enterprise" ] || [ -f /etc/oracle-release ]; then
+                # Oracle "Enterprise Linux"/"Linux"
+                DISTRO="Oracle"
+                VERSION=`echo $PLATFORM | awk '{print $7}'`
+           elif [ "$DISTRO" = "Red" ]; then
                 DISTRO="RHEL"
                 VERSION=`echo $PLATFORM | awk '{print $7}'`
            else
