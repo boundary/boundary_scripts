@@ -8,9 +8,9 @@ import os
 
 __all__ = [ 'main', ]
 
-#Define ORG ID and API KEY
-API_KEY=""
-ORG_ID=""
+# Use environment variables if set other set to empty
+API_KEY=os.environ['BOUNDARY_API_KEY']
+ORG_ID=os.environ['BOUNDARY_ORG_ID']
 API_URL="https://api.boundary.com/" + ORG_ID + "/events"
 
 def encode_bn_auth():
