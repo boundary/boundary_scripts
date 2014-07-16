@@ -80,7 +80,7 @@ STAGING="false"
 trap "exit" INT TERM EXIT
 
 function print_supported_platforms() {
-	echo
+    echo
     echo "Supported platforms by the installation script are:"
     for d in ${PLATFORMS[*]}
     do
@@ -103,7 +103,7 @@ if [ $? -eq 0 ]; then
 else
     which ec2-describe-tags > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-	    EC2_DESC_TAGS=ec2-describe-tags
+        EC2_DESC_TAGS=ec2-describe-tags
     fi
 fi
 
@@ -197,7 +197,7 @@ function check_distro_version() {
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
 
-	else
+    else
         VERSION_CMP=$VERSION
     fi
 
@@ -225,10 +225,10 @@ function do_install() {
     export INSTALLTOKEN="${APICREDS}"
     export PROVISIONTAGS="${METERTAGS}"
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-		APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
-		if [ "$DISTRO" = "Debian" ]; then
-			APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
-		fi
+        APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+        if [ "$DISTRO" = "Debian" ]; then
+            APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
+        fi
         echo "Adding repository $APT_STRING"
         sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
@@ -312,12 +312,12 @@ EOF"
 
     elif [ "$DISTRO" = "Gentoo" ]; then
         if [ -e boundary-meter ]; then
-	    echo
+            echo
             echo "The installation script needs to create a 'boundary-meter' directory in the current"
-	    echo "working directory for installation to proceed. Please run this script from"
-	    echo "another location or remove the currently-existing 'boundary-meter' file or directory"
-	    echo "and try again."
-	    echo
+            echo "working directory for installation to proceed. Please run this script from"
+            echo "another location or remove the currently-existing 'boundary-meter' file or directory"
+            echo "and try again."
+            echo
             return 1
         fi
         mkdir boundary-meter
@@ -332,23 +332,23 @@ EOF"
 function pre_install_sanity() {
     which curl > /dev/null
     if [ $? -gt 0 ]; then
-		echo "Installing curl ..."
+        echo "Installing curl ..."
 
-		if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-			echo "Updating apt repository cache..."
-			$APT_CMD update > /dev/null
-			$APT_CMD install curl
+        if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+            echo "Updating apt repository cache..."
+            $APT_CMD update > /dev/null
+            $APT_CMD install curl
 
-		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
-			if [ "$MACHINE" = "i686" ]; then
-				$YUM_CMD install curl.i686
+        elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+            if [ "$MACHINE" = "i686" ]; then
+                $YUM_CMD install curl.i686
             elif [ "$MACHINE" = "x86_64" ]; then
-				$YUM_CMD install curl.x86_64
-			fi
+                $YUM_CMD install curl.x86_64
+            fi
 
-		elif [ $DISTRO = "FreeBSD" ]; then
+        elif [ $DISTRO = "FreeBSD" ]; then
             pkg install -y curl
-		fi
+        fi
     fi
 
     if [ $DISTRO = "SmartOS" ]; then
@@ -361,10 +361,10 @@ function pre_install_sanity() {
         test -f /usr/lib/apt/methods/https
         if [ $? -gt 0 ];then
             echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
-			echo "Updating apt repository cache..."
-			$APT_CMD update > /dev/null
-			echo "Installing apt-transport-https ..."
-			$APT_CMD install apt-transport-https
+            echo "Updating apt repository cache..."
+            $APT_CMD update > /dev/null
+            echo "Installing apt-transport-https ..."
+            $APT_CMD install apt-transport-https
         fi
     fi
 }
@@ -502,29 +502,29 @@ fi
 
 #determine hard vs. soft float using readelf
 if [[ "$MACHINE" == arm* ]] ; then
-	if [ -x /usr/bin/readelf ] ; then
-		HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
-		if [ -z "$HARDFLOAT" ]; then
-			if [ "$MACHINE" = "armv7l" ] ||
-			   [ "$MACHINE" = "armv6l" ] ||
-			   [ "$MACHINE" = "armv5tel" ] ||
-			   [ "$MACHINE" = "armv5tejl" ] ; then
-				ARCH="32"
-				SUPPORTED_ARCH=1
-				echo "Detected $MACHINE running armel"
-			fi
-		else
-			if [ "$MACHINE" = "armv7l" ] ; then
-				ARCH="32"
-				SUPPORTED_ARCH=1
-				echo "Detected $MACHINE running armhf"
-			else
-				echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
-			fi
-		fi
-	else
-		echo "Cannot determine ARM ABI, please install the 'binutils' package"
-	fi
+    if [ -x /usr/bin/readelf ] ; then
+        HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
+        if [ -z "$HARDFLOAT" ]; then
+            if [ "$MACHINE" = "armv7l" ] ||
+               [ "$MACHINE" = "armv6l" ] ||
+               [ "$MACHINE" = "armv5tel" ] ||
+               [ "$MACHINE" = "armv5tejl" ] ; then
+                ARCH="32"
+                SUPPORTED_ARCH=1
+                echo "Detected $MACHINE running armel"
+            fi
+        else
+            if [ "$MACHINE" = "armv7l" ] ; then
+                ARCH="32"
+                SUPPORTED_ARCH=1
+                echo "Detected $MACHINE running armhf"
+            else
+                echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
+            fi
+        fi
+    else
+        echo "Cannot determine ARM ABI, please install the 'binutils' package"
+    fi
 fi
 
 if [ "$MACHINE" = "x86_64" ] || [ "$MACHINE" = "amd64" ]; then
@@ -548,7 +548,7 @@ for d in ${PLATFORMS[*]} ; do
 done
 if [ $SUPPORTED_PLATFORM -eq 0 ]; then
     echo "Your platform is not supported by this script at this time."
-	echo "Please check https://app.boundary.com/docs/meter_install for alternate installation instructions."
+    echo "Please check https://app.boundary.com/docs/meter_install for alternate installation instructions."
     print_supported_platforms
     exit 1
 fi
@@ -557,11 +557,11 @@ fi
 APIID=`echo $APICREDS | awk -F: '{print $1}'`
 APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 if [ "${#APIID}" -lt 10 -o "${#APIKEY}" -lt 10 ]; then
-	echo "Please enter a valid installation token"
-	echo "Expected APIID:APIKEY, got: '${APICREDS}'"
-	echo
+    echo "Please enter a valid installation token"
+    echo "Expected APIID:APIKEY, got: '${APICREDS}'"
+    echo
 
-	print_help
+    print_help
 fi
 
 if [ -z $APICREDS ]; then
@@ -570,18 +570,18 @@ fi
 
 # If this script is being run by root for some reason, don't use sudo.
 if [ "$(id -u)" != "0" ]; then
-	SUDO=`which sudo`
-	if [ $? -ne 0 ]; then
-		echo "This script must be executed as the 'root' user or with sudo"
-		echo "in order to install the Boundary meter."
-		echo
-		echo "Please install sudo or run again as the 'root' user."
-		echo "For assistance, support@boundary.com"
-		exit 1
-	else
-		sudo -E $0 $@
-		exit 0
-	fi
+    SUDO=`which sudo`
+    if [ $? -ne 0 ]; then
+        echo "This script must be executed as the 'root' user or with sudo"
+        echo "in order to install the Boundary meter."
+        echo
+        echo "Please install sudo or run again as the 'root' user."
+        echo "For assistance, support@boundary.com"
+        exit 1
+    else
+        sudo -E $0 $@
+        exit 0
+    fi
 fi
 
 echo "Detected $DISTRO $VERSION..."
