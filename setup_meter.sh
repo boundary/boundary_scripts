@@ -196,6 +196,7 @@ function check_distro_version() {
     elif [ $DISTRO = "Debian" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
+
 	else
         VERSION_CMP=$VERSION
     fi
@@ -255,7 +256,7 @@ function do_install() {
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
         zypper addrepo -c -k -f -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
 
-        zypper install -y boundary-meter
+        zypper install -f -y boundary-meter
         return $?
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
@@ -307,7 +308,8 @@ EOF"
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
         fetch "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz"
-        pkg add boundary-meter-current.txz
+        pkg add -f boundary-meter-current.txz
+
     elif [ "$DISTRO" = "Gentoo" ]; then
         if [ -e boundary-meter ]; then
 	    echo
@@ -340,14 +342,12 @@ function pre_install_sanity() {
 		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
 			if [ "$MACHINE" = "i686" ]; then
 				$YUM_CMD install curl.i686
-			fi
-
-			if [ "$MACHINE" = "x86_64" ]; then
+            elif [ "$MACHINE" = "x86_64" ]; then
 				$YUM_CMD install curl.x86_64
 			fi
 
 		elif [ $DISTRO = "FreeBSD" ]; then
-			pkg_add -r curl
+            pkg install -y curl
 		fi
     fi
 
