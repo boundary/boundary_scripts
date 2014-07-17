@@ -436,13 +436,6 @@ else
       DISTRO="SmartOS"
       MACHINE="i386"
       VERSION=13
-      if [ -f /etc/product ]; then
-        grep "base64" /etc/product > /dev/null
-        if [ "$?" = "0" ]; then
-            MACHINE="x86_64"
-        fi
-        VERSION=`grep 'Image' /etc/product | awk '{ print $3}' | awk -F. '{print $1}'`
-      fi
     elif [ "$?" != "0" ]; then
         uname -sv | grep 'FreeBSD' > /dev/null
         if [ "$?" = "0" ]; then
