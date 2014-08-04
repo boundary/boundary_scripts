@@ -17,6 +17,8 @@ set -o pipefail
 ### limitations under the License.
 ###
 
+SCRIPT_NAME=${0}
+
 PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle")
 
 # Put additional version numbers here.
@@ -232,9 +234,9 @@ function do_install() {
         echo "Adding repository $APT_STRING"
         sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | apt-key add -
+        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} | apt-key add -
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
+            echo "Error adding Boundary GPG key to list of trusted keys!"
             exit 1
         fi
 
@@ -244,14 +246,15 @@ function do_install() {
         return $?
 
     elif [ "$DISTRO" = "openSUSE" ]; then
+        GPG_KEY_LOCATION=/tmp/RPM-GPG-KEY-Boundary
         ARCH_STR="x86_64/"
 
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary > RPM-GPG-KEY-Boundary
+        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} > ${GPG_KEY_LOCATION}
+        rpm --import ${GPG_KEY_LOCATION}
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+            echo "Error adding Boundary GPG key to list of trusted keys!"
             exit 1
         fi
-        rpm --import ./RPM-GPG-KEY-Boundary
 
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
         zypper addrepo -c -k -f -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
@@ -284,12 +287,7 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-        if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
-            exit 1
-        fi
-
+        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} > ${GPG_KEY_LOCATION}
         $YUM_CMD install boundary-meter
         return $?
 
@@ -617,3 +615,25 @@ fi
 
 echo ""
 echo "The meter has been installed successfully!"
+
+exit 0
+
+===== DO NOT MODIFY THIS LINE OR BELOW =====
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+
+mQENBE3WllEBCADlEuA7DCcI0B1/1rXJ4SzzQGXcHwmsxLVGnRR9FX4Fu3oCz4sc
+18/FkPHb2AwFfClv4xH6gOUBJVCDyub/C6PJeLolkc51SLA2lO3y5e3OpJ7uC8Ln
+/P5AC96FDhIEPH+vVnBVxgYRFj/1vDlqUcJXUSN3ZnLxzHwnHJ+lATNydbTi3ltL
+Kr53YOD5FmuKpc2hkNzT+9Lg1/aVEKXpnSjzlNT/1VIrXgJOzv/xyKvpSD2fb5M3
+QZMjEkrod5botvclt/y6P8LNWsmlG0eM+JiewnDzwJ3OnhekSzHqoh3kVKQ3YJed
+i1ZKInNthXQ5sSiHrsxHhJFGuVAQVA0/AmJfABEBAAG0G0JvdW5kYXJ5IDxvcHNA
+Ym91bmRhcnkuY29tPokBOAQTAQIAIgUCTdaWUQIbAwYLCQgHAwIGFQgCCQoLBBYC
+AwECHgECF4AACgkQQ4Go5GUyzCAqWggAjuJgzEYO1nTVd4hBhkhuxH1d/9R5eDzN
+SvxMk9gI2kKd71DsVP7PCVlPPIkzqL/IMv5ffO3me3R0S3bZzquhCOhrUc987GgZ
++rPEcb0sDjT4fzcVeAOuaIf3T8oysx9ngB5pE4i3fatD43WvTGbj4LmU9XxiwZ6z
+AKzIYltGy/+Cq2JJjYgg80O2RmG8FFf8k/FujkbsNgNICQwWnAGKKlpJ4b65M5zu
+oNNUGFcJopGGufKLxXAiRwJqOx8a+EvD7/MEs5VYQJGeBgoaE6ZgXwufYJYn0Lv3
+6fxTtkLlIrD27gvTbV1oF8tj+T+7ayKj75YGnaH03QYBOG8tmbqV/A==
+=p4gi
+-----END PGP PUBLIC KEY BLOCK-----
