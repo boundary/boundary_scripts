@@ -17,6 +17,8 @@ set -o pipefail
 ### limitations under the License.
 ###
 
+SCRIPT_NAME=${0}
+
 PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle")
 
 # Put additional version numbers here.
@@ -29,7 +31,7 @@ Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
-FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 8.4-RELEASE 9.0-RELEASE 9.1-RELEASE 9.2-RELEASE")
+FreeBSD_VERSIONS=("9.0-RELEASE 9.1-RELEASE 9.2-RELEASE 10.0-RELEASE")
 LinuxMint_VERSIONS=("13", "14", "15", "16")
 Gentoo_VERSIONS=("1.12.11.1")
 Oracle_VERSIONS=("5" "6")
@@ -60,7 +62,6 @@ map RHEL 6 Santiago
 
 APIHOST="api.boundary.com"
 APICREDS=
-TARGET_DIR="/etc/bprobe"
 
 METERTAGS=
 
@@ -81,15 +82,14 @@ STAGING="false"
 trap "exit" INT TERM EXIT
 
 function print_supported_platforms() {
-	echo
+    echo
     echo "Supported platforms by the installation script are:"
     for d in ${PLATFORMS[*]}
     do
         echo -n " * $d:"
         foo="\${${d}_VERSIONS[*]}"
         versions=`eval echo $foo`
-        for v in $versions
-        do
+        for v in $versions; do
             echo -n " $v"
         done
         echo ""
@@ -105,7 +105,7 @@ if [ $? -eq 0 ]; then
 else
     which ec2-describe-tags > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-	    EC2_DESC_TAGS=ec2-describe-tags
+        EC2_DESC_TAGS=ec2-describe-tags
     fi
 fi
 
@@ -115,6 +115,15 @@ function ec2_find_tags() {
     exit_code=$?
 
     if [ "$exit_code" -eq "0" ]; then
+        # check to see if we *really* are on EC2.
+        # Some Proxies emit false results for non-existent server addresses
+        $CURL -is --connect-timeout 5 "$EC2_INTERNAL" | grep 'Server: EC2ws' > /dev/null
+        exit_code=$?
+
+        if [ "$exit_code" -ne "0" ]; then
+            echo "no."
+            return 0
+        fi
         echo "yes."
         echo "Auto generating ec2 tags for this meter."
     else
@@ -189,7 +198,8 @@ function check_distro_version() {
     elif [ $DISTRO = "Debian" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
-	else
+
+    else
         VERSION_CMP=$VERSION
     fi
 
@@ -217,38 +227,39 @@ function do_install() {
     export INSTALLTOKEN="${APICREDS}"
     export PROVISIONTAGS="${METERTAGS}"
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-		APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
-		if [ "$DISTRO" = "Debian" ]; then
-			APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
-		fi
+        APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+        if [ "$DISTRO" = "Debian" ]; then
+            APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
+        fi
         echo "Adding repository $APT_STRING"
         sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | apt-key add -
+        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} | apt-key add -
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
+            echo "Error adding Boundary GPG key to list of trusted keys!"
             exit 1
         fi
 
         echo "Updating apt repository cache..."
         $APT_CMD update > /dev/null
-        $APT_CMD install bprobe
+        $APT_CMD install boundary-meter
         return $?
 
     elif [ "$DISTRO" = "openSUSE" ]; then
+        GPG_KEY_LOCATION=/tmp/RPM-GPG-KEY-Boundary
         ARCH_STR="x86_64/"
 
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary > RPM-GPG-KEY-Boundary
+        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} > ${GPG_KEY_LOCATION}
+        rpm --import ${GPG_KEY_LOCATION}
         if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+            echo "Error adding Boundary GPG key to list of trusted keys!"
             exit 1
         fi
-        rpm --import ./RPM-GPG-KEY-Boundary
 
         echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
         zypper addrepo -c -k -f -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
 
-        zypper install -y bprobe
+        zypper install -f -y boundary-meter
         return $?
 
     elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
@@ -276,83 +287,66 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-        if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
-            exit 1
-        fi
-
-        $YUM_CMD install bprobe
+        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} > ${GPG_KEY_LOCATION}
+        $YUM_CMD install boundary-meter
         return $?
 
     elif [ "$DISTRO" = "SmartOS" ]; then
-      grep "http://${SMARTOS}/${MACHINE}" /opt/local/etc/pkgin/repositories.conf > /dev/null
-
-      if [ "$?" = "1" ]; then
-        echo "http://${SMARTOS}/${MACHINE}/" >> /opt/local/etc/pkgin/repositories.conf
-      fi
-
-      pkgin -fy up
-      pkgin -y install bprobe
+      SMARTOS_PKG=$(curl -s http://${SMARTOS}/${MACHINE}/ | sed -n 's/^.*\"\(boundary-meter.*tgz\)\".*$/\1/p' | tail -n 1)
+      pkg_add -f -v http://${SMARTOS}/${MACHINE}/${SMARTOS_PKG}
       # Enable promiscuous mode on SmartOS by default.
       # Non-promiscuous mode is not very useful because the OS only forwards
       # received traffic.
-      if [ -f /opt/local/etc/bprobe/bprobe.default -a ! -f /opt/local/etc/bprobe/bprobe.defaults ]; then
-          sed -e 's/PCAP_PROMISC=0/PCAP_PROMISC=1/' /opt/local/etc/bprobe/bprobe.default > /opt/local/etc/bprobe/bprobe.defaults
-          rm /opt/local/etc/bprobe/bprobe.default
+      if [ -f /opt/local/etc/boundary/meter.defaults ]; then
+          sed -i -e 's/PCAP_PROMISC=0/PCAP_PROMISC=1/' /opt/local/etc/boundary/meter.defaults
       fi
       svccfg import /opt/custom/smf/boundary-meter.xml
       svcadm enable boundary/meter
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
-        pkg_add bprobe-current.tgz
+        fetch "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz"
+        pkg add -f boundary-meter-current.txz
+
     elif [ "$DISTRO" = "Gentoo" ]; then
-        if [ -e bprobe ]; then
-	    echo
-            echo "The installation script needs to create a 'bprobe' directory in the current"
-	    echo "working directory for installation to proceed. Please run this script from"
-	    echo "another location or remove the currently-existing 'bprobe' file or directory"
-	    echo "and try again."
-	    echo
+        if [ -e boundary-meter ]; then
+            echo
+            echo "The installation script needs to create a 'boundary-meter' directory in the current"
+            echo "working directory for installation to proceed. Please run this script from"
+            echo "another location or remove the currently-existing 'boundary-meter' file or directory"
+            echo "and try again."
+            echo
             return 1
         fi
-        mkdir bprobe
-        (cd bprobe;
+        mkdir boundary-meter
+        (cd boundary-meter;
          wget "http://${GENTOO}/engineyard/latest"
          wget "http://${GENTOO}/engineyard/`cat latest`")
-        ebuild --skip-manifest bprobe/`cat bprobe/latest` merge
-        rm -fr bprobe
+        ebuild --skip-manifest boundary-meter/`cat boundary-meter/latest` merge
+        rm -fr boundary-meter
     fi
 }
 
 function pre_install_sanity() {
-    if [ $DISTRO = "SmartOS" ]; then
-      TARGET_DIR="/opt/local/etc/bprobe"
-    fi
-
     which curl > /dev/null
     if [ $? -gt 0 ]; then
-		echo "Installing curl ..."
+        echo "Installing curl ..."
 
-		if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-			echo "Updating apt repository cache..."
-			$APT_CMD update > /dev/null
-			$APT_CMD install curl
+        if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+            echo "Updating apt repository cache..."
+            $APT_CMD update > /dev/null
+            $APT_CMD install curl
 
-		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
-			if [ "$MACHINE" = "i686" ]; then
-				$YUM_CMD install curl.i686
-			fi
+        elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+            if [ "$MACHINE" = "i686" ]; then
+                $YUM_CMD install curl.i686
+            elif [ "$MACHINE" = "x86_64" ]; then
+                $YUM_CMD install curl.x86_64
+            fi
 
-			if [ "$MACHINE" = "x86_64" ]; then
-				$YUM_CMD install curl.x86_64
-			fi
-
-		elif [ $DISTRO = "FreeBSD" ]; then
-			pkg_add -r curl
-		fi
+        elif [ $DISTRO = "FreeBSD" ]; then
+            pkg install -y curl
+        fi
     fi
 
     if [ $DISTRO = "SmartOS" ]; then
@@ -365,10 +359,10 @@ function pre_install_sanity() {
         test -f /usr/lib/apt/methods/https
         if [ $? -gt 0 ];then
             echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
-			echo "Updating apt repository cache..."
-			$APT_CMD update > /dev/null
-			echo "Installing apt-transport-https ..."
-			$APT_CMD install apt-transport-https
+            echo "Updating apt repository cache..."
+            $APT_CMD update > /dev/null
+            echo "Installing apt-transport-https ..."
+            $APT_CMD install apt-transport-https
         fi
     fi
 }
@@ -440,13 +434,6 @@ else
       DISTRO="SmartOS"
       MACHINE="i386"
       VERSION=13
-      if [ -f /etc/product ]; then
-        grep "base64" /etc/product > /dev/null
-        if [ "$?" = "0" ]; then
-            MACHINE="x86_64"
-        fi
-        VERSION=`grep 'Image' /etc/product | awk '{ print $3}' | awk -F. '{print $1}'`
-      fi
     elif [ "$?" != "0" ]; then
         uname -sv | grep 'FreeBSD' > /dev/null
         if [ "$?" = "0" ]; then
@@ -506,29 +493,29 @@ fi
 
 #determine hard vs. soft float using readelf
 if [[ "$MACHINE" == arm* ]] ; then
-	if [ -x /usr/bin/readelf ] ; then
-		HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
-		if [ -z "$HARDFLOAT" ]; then
-			if [ "$MACHINE" = "armv7l" ] ||
-			   [ "$MACHINE" = "armv6l" ] ||
-			   [ "$MACHINE" = "armv5tel" ] ||
-			   [ "$MACHINE" = "armv5tejl" ] ; then
-				ARCH="32"
-				SUPPORTED_ARCH=1
-				echo "Detected $MACHINE running armel"
-			fi
-		else
-			if [ "$MACHINE" = "armv7l" ] ; then
-				ARCH="32"
-				SUPPORTED_ARCH=1
-				echo "Detected $MACHINE running armhf"
-			else
-				echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
-			fi
-		fi
-	else
-		echo "Cannot determine ARM ABI, please install the 'binutils' package"
-	fi
+    if [ -x /usr/bin/readelf ] ; then
+        HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
+        if [ -z "$HARDFLOAT" ]; then
+            if [ "$MACHINE" = "armv7l" ] ||
+               [ "$MACHINE" = "armv6l" ] ||
+               [ "$MACHINE" = "armv5tel" ] ||
+               [ "$MACHINE" = "armv5tejl" ] ; then
+                ARCH="32"
+                SUPPORTED_ARCH=1
+                echo "Detected $MACHINE running armel"
+            fi
+        else
+            if [ "$MACHINE" = "armv7l" ] ; then
+                ARCH="32"
+                SUPPORTED_ARCH=1
+                echo "Detected $MACHINE running armhf"
+            else
+                echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
+            fi
+        fi
+    else
+        echo "Cannot determine ARM ABI, please install the 'binutils' package"
+    fi
 fi
 
 if [ "$MACHINE" = "x86_64" ] || [ "$MACHINE" = "amd64" ]; then
@@ -552,7 +539,7 @@ for d in ${PLATFORMS[*]} ; do
 done
 if [ $SUPPORTED_PLATFORM -eq 0 ]; then
     echo "Your platform is not supported by this script at this time."
-	echo "Please check https://app.boundary.com/docs/meter_install for alternate installation instructions."
+    echo "Please check https://app.boundary.com/docs/meter_install for alternate installation instructions."
     print_supported_platforms
     exit 1
 fi
@@ -561,11 +548,11 @@ fi
 APIID=`echo $APICREDS | awk -F: '{print $1}'`
 APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
 if [ "${#APIID}" -lt 10 -o "${#APIKEY}" -lt 10 ]; then
-	echo "Please enter a valid installation token"
-	echo "Expected APIID:APIKEY, got: '${APICREDS}'"
-	echo
+    echo "Please enter a valid installation token"
+    echo "Expected APIID:APIKEY, got: '${APICREDS}'"
+    echo
 
-	print_help
+    print_help
 fi
 
 if [ -z $APICREDS ]; then
@@ -574,18 +561,18 @@ fi
 
 # If this script is being run by root for some reason, don't use sudo.
 if [ "$(id -u)" != "0" ]; then
-	SUDO=`which sudo`
-	if [ $? -ne 0 ]; then
-		echo "This script must be executed as the 'root' user or with sudo"
-		echo "in order to install the Boundary meter."
-		echo
-		echo "Please install sudo or run again as the 'root' user."
-		echo "For assistance, support@boundary.com"
-		exit 1
-	else
-		sudo -E $0 $@
-		exit 0
-	fi
+    SUDO=`which sudo`
+    if [ $? -ne 0 ]; then
+        echo "This script must be executed as the 'root' user or with sudo"
+        echo "in order to install the Boundary meter."
+        echo
+        echo "Please install sudo or run again as the 'root' user."
+        echo "For assistance, support@boundary.com"
+        exit 1
+    else
+        sudo -E $0 $@
+        exit 0
+    fi
 fi
 
 echo "Detected $DISTRO $VERSION..."
@@ -628,3 +615,25 @@ fi
 
 echo ""
 echo "The meter has been installed successfully!"
+
+exit 0
+
+===== DO NOT MODIFY THIS LINE OR BELOW =====
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+
+mQENBE3WllEBCADlEuA7DCcI0B1/1rXJ4SzzQGXcHwmsxLVGnRR9FX4Fu3oCz4sc
+18/FkPHb2AwFfClv4xH6gOUBJVCDyub/C6PJeLolkc51SLA2lO3y5e3OpJ7uC8Ln
+/P5AC96FDhIEPH+vVnBVxgYRFj/1vDlqUcJXUSN3ZnLxzHwnHJ+lATNydbTi3ltL
+Kr53YOD5FmuKpc2hkNzT+9Lg1/aVEKXpnSjzlNT/1VIrXgJOzv/xyKvpSD2fb5M3
+QZMjEkrod5botvclt/y6P8LNWsmlG0eM+JiewnDzwJ3OnhekSzHqoh3kVKQ3YJed
+i1ZKInNthXQ5sSiHrsxHhJFGuVAQVA0/AmJfABEBAAG0G0JvdW5kYXJ5IDxvcHNA
+Ym91bmRhcnkuY29tPokBOAQTAQIAIgUCTdaWUQIbAwYLCQgHAwIGFQgCCQoLBBYC
+AwECHgECF4AACgkQQ4Go5GUyzCAqWggAjuJgzEYO1nTVd4hBhkhuxH1d/9R5eDzN
+SvxMk9gI2kKd71DsVP7PCVlPPIkzqL/IMv5ffO3me3R0S3bZzquhCOhrUc987GgZ
++rPEcb0sDjT4fzcVeAOuaIf3T8oysx9ngB5pE4i3fatD43WvTGbj4LmU9XxiwZ6z
+AKzIYltGy/+Cq2JJjYgg80O2RmG8FFf8k/FujkbsNgNICQwWnAGKKlpJ4b65M5zu
+oNNUGFcJopGGufKLxXAiRwJqOx8a+EvD7/MEs5VYQJGeBgoaE6ZgXwufYJYn0Lv3
+6fxTtkLlIrD27gvTbV1oF8tj+T+7ayKj75YGnaH03QYBOG8tmbqV/A==
+=p4gi
+-----END PGP PUBLIC KEY BLOCK-----
