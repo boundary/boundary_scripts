@@ -17,17 +17,22 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
-Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10")
+Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10" "14.04")
 Debian_VERSIONS=("5" "6" "7")
 CentOS_VERSIONS=("5" "6")
 Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
+openSUSE_VERSIONS=("12.1" "12.3" "13.1")
+FreeBSD_VERSIONS=("8.2-RELEASE 8.3-RELEASE 8.4-RELEASE 9.0-RELEASE 9.1-RELEASE 9.2-RELEASE")
+LinuxMint_VERSIONS=("13", "14", "15", "16")
+Gentoo_VERSIONS=("1.12.11.1")
+Oracle_VERSIONS=("5" "6")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -43,6 +48,7 @@ map Ubuntu 12.04 precise
 map Ubuntu 12.10 quantal
 map Ubuntu 13.04 raring
 map Ubuntu 13.10 saucy
+map Ubuntu 14.04 trusty
 map Debian 5 lenny
 map Debian 6 squeeze
 map Debian 7 wheezy
@@ -53,10 +59,10 @@ map RHEL 6 Santiago
 # -----------------------------------------------------------------------------
 
 APIHOST="api.boundary.com"
+APICREDS=
 TARGET_DIR="/etc/bprobe"
 
-EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
-TAGS="instance-type placement/availability-zone"
+METERTAGS=
 
 SUPPORTED_ARCH=0
 SUPPORTED_PLATFORM=0
@@ -64,18 +70,19 @@ SUPPORTED_PLATFORM=0
 APT="apt.boundary.com"
 YUM="yum.boundary.com"
 SMARTOS="smartos.boundary.com"
+FREEBSD="freebsd.boundary.com"
+GENTOO="gentoo.boundary.com"
 
 APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
 
-DEPS="false"
 STAGING="false"
-CACERTS=
 
 trap "exit" INT TERM EXIT
 
 function print_supported_platforms() {
-    echo "Supported platforms are:"
+	echo
+    echo "Supported platforms by the installation script are:"
     for d in ${PLATFORMS[*]}
     do
         echo -n " * $d:"
@@ -89,340 +96,39 @@ function print_supported_platforms() {
     done
 }
 
-function check_distro_version() {
-    PLATFORM=$1
-    DISTRO=$2
-    VERSION=$3
-
-    TEMP="\${${DISTRO}_versions[*]}"
-    VERSIONS=`eval echo $TEMP`
-
-    if [ $DISTRO = "Ubuntu" ]; then
-        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-        PATCH_VERSION=`echo $VERSION | awk -F. '{print $3}'`
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$MAJOR_VERSION.$MINOR_VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
-
-    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ]; then
-        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$MAJOR_VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
-
-    elif [ $DISTRO = "Amazon" ]; then
-        VERSION=`echo $PLATFORM | awk '{print $5}'`
-        # Some of these include minor numbers. Trim.
-        VERSION=${VERSION:0:7}
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
-
-    elif [ $DISTRO = "Debian" ]; then
-        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
-        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$MAJOR_VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
-
-    elif [ $DISTRO = "SmartOS" ]; then
-        # SmartOS does not have version numbers
-        TEMP="\${${DISTRO}_VERSIONS[*]}"
-        VERSIONS=`eval echo $TEMP`
-        for v in $VERSIONS ; do
-            if [ "$VERSION" = "$v" ]; then
-                return 0
-            fi
-        done
+EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
+EC2_TAGS="instance-type placement/availability-zone"
+EC2_DESC_TAGS=
+which euca-describe-tags > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    EC2_DESC_TAGS=euca-describe-tags
+else
+    which ec2-describe-tags > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+	    EC2_DESC_TAGS=ec2-describe-tags
     fi
+fi
 
-    echo "Detected $DISTRO but with an unsupported version ($VERSION)"
-    return 1
-}
-
-function print_help() {
-    echo "   $0 [-d] -i ORGID:APIKEY"
-    echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
-    echo "          in the Account Settings in the Boundary WebUI."
-    echo "      -d: Optional flag to install all dependencies, such as curl and"
-    echo "          apt-transport-https, required for Meter Install."
-    exit 0
-}
-
-function create_meter() {
-
-    if [ "${HOSTNAME}" = "" ]; then
-        echo "Host does not appear to have a hostname set!"
-        echo "For assistance, please contain support@boundary.com"
-        exit 1
-    fi
-
-    RESULT=`$CURL --connect-timeout 5 -i -s -X POST \
-        -H "Content-Type: application/json" \
-        -d "{\"name\": \"$HOSTNAME\"}" -u "$1:" \
-        https://$APIHOST/$2/meters \
-        | tr -d "\r" \
-        | awk '/^HTTP\/1\./ {split($0,a," "); http=a[2]} /^Location: https:\/\// {split($0,a," "); url=a[2]} END {print http; print url}'`
-
-    exit_status=$?
-
-    # an exit status of 1 indicates an unsupported protocol. (e.g.,
-    # https hasn't been baked in.)
-    if [ "$exit_status" -eq "1" ]; then
-        echo "Your local version of curl has not been built with HTTPS support: `which curl`"
-        exit 1
-
-    elif [ "$exit_status" -eq "6" ]; then
-        echo "Could not resolve $APIHOST, check network connectivity or DNS settings"
-        exit 1
-
-    # if the exit code is 7, that means curl couldnt connect so we can bail
-    elif [ "$exit_status" -eq "7" ]; then
-        echo "Could not connect to create meter"
-        exit 1
-
-    # it appears that an exit code of 28 is also a can't connect error
-    elif [ "$exit_status" -eq "28" ]; then
-        echo "Could not connect to create meter"
-        exit 1
-
-    elif [ "$exit_status" -ne "0" ]; then
-        echo "Error connecting to $APIHOST; status $exit_status."
-        exit 1
-    fi
-
-    STATUS=`echo $RESULT | awk '{print $1}'`
-
-    if [ "$STATUS" = "" ]; then
-        echo "Unknown error communicating with $APIHOST."
-        exit 1
-
-    elif [ "$STATUS" = "401" ]; then
-        echo "Authentication error, bad Org ID or API key (http status $STATUS)."
-        echo "Verify that you have passed in the correct credentials.  The ORGID and APIKEY"
-        echo "can be found in the Account Settings in the Boundary WebUI."
-        exit 1
-
-    elif [ "$STATUS" = "403" ]; then
-        echo "Forbidden error (http status $STATUS)."
-        echo "Verify that you have not exceeded your meter limit."
-        echo "If you haven't, please contact support at support@boundary.com."
-        exit 1
-
-    else
-        if [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ]; then
-            echo $RESULT | awk '{print $2}'
-        else
-            echo "An Error occurred during the meter creation (http status $STATUS)."
-            echo "Please contact support at support@boundary.com."
-            exit 1
-        fi
-    fi
-}
-
-function do_install() {
-    if [ "$DISTRO" = "Ubuntu" ]; then
-        echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
-
-        APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
-        echo "Adding repository $APT_STRING"
-        sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
-
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
-        if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
-            exit 1
-        fi
-
-        echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
-        sudo $APT_CMD install bprobe
-        return $?
-    elif [ "$DISTRO" = "Debian" ]; then
-        echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
-
-        APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
-        echo "Adding repository $APT_STRING"
-        sudo sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
-
-        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | sudo apt-key add -
-        if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
-            exit 1
-        fi
-
-        echo "Updating apt repository cache..."
-        sudo $APT_CMD update > /dev/null
-        sudo $APT_CMD install bprobe
-        return $?
-    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
-        GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
-        if [ $MACHINE = "i686" ]; then
-            ARCH_STR="i386/"
-        elif [ $MACHINE = "x86_64" ]; then
-            ARCH_STR="x86_64/"
-        fi
-
-        # Amazon hack: we know the Amazon Linux AMIs are binary
-        # compatible with CentOS
-        if [ $DISTRO = "Amazon" ]; then
-            MAJOR_VERSION=6
-        fi
-
-        echo "Adding repository http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR"
-
-        sudo sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
-[boundary]
-name=boundary
-baseurl=http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR
-gpgcheck=1
-gpgkey=file://$GPG_KEY_LOCATION
-enabled=1
-EOF"
-
-        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
-        if [ $? -gt 0 ]; then
-            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
-            exit 1
-        fi
-
-        sudo $YUM_CMD install bprobe
-        return $?
-    elif [ "$DISTRO" = "SmartOS" ]; then
-      SMARTOS_PKG=$(curl -s http://smartos.boundary.com/$MACHINE/ | grep "a href" | grep bprobe | tail -n1 | cut -d"\"" -f 4)
-      pkg_add -f -v http://$SMARTOS/$MACHINE/$SMARTOS_PKG
-      svccfg import /opt/custom/smf/boundary-meter.xml
-      svcadm enable boundary/meter
-      return $?
-    fi
-}
-
-function setup_cert_key() {
-    trap "exit" INT TERM EXIT
-
-    test -d $TARGET_DIR
-
-    if [ $? -eq 1 ]; then
-        echo "Creating meter config directory ($TARGET_DIR) ..."
-        if [ $DISTRO = "SmartOS" ]; then
-            mkdir $TARGET_DIR
-        else
-            sudo mkdir $TARGET_DIR
-        fi
-    fi
-
-    test -f $TARGET_DIR/key.pem
-
-    if [ $? -eq 1 ]; then
-        echo "Key file is missing, attempting to download ..."
-        echo "Downloading meter key for $2"
-        if [ $DISTRO = "SmartOS" ]; then
-            $CURL -s -u $1: $2/key.pem | tee $TARGET_DIR/key.pem > /dev/null
-        else
-            $CURL -s -u $1: $2/key.pem | sudo tee $TARGET_DIR/key.pem > /dev/null
-        fi
-
-        if [ $? -gt 0 ]; then
-            echo "Error downloading key ..."
-            exit 1
-        fi
-
-        if [ $DISTRO = "SmartOS" ]; then
-            chmod 600 $TARGET_DIR/key.pem
-        else
-            sudo chmod 600 $TARGET_DIR/key.pem
-        fi
-    fi
-
-    test -f $TARGET_DIR/cert.pem
-
-    if [ $? -eq 1 ]; then
-        echo "Cert file is missing, attempting to download ..."
-        echo "Downloading meter certificate for $2"
-        if [ $DISTRO = "SmartOS" ]; then
-            $CURL -s -u $1: $2/cert.pem | tee $TARGET_DIR/cert.pem > /dev/null
-        else
-            $CURL -s -u $1: $2/cert.pem | sudo tee $TARGET_DIR/cert.pem > /dev/null
-        fi
-
-        if [ $? -gt 0 ]; then
-            echo "Error downloading certificate ..."
-            exit 1
-        fi
-
-        if [ $DISTRO = "SmartOS" ]; then
-            chmod 600 $TARGET_DIR/cert.pem
-        else
-            sudo chmod 600 $TARGET_DIR/cert.pem
-        fi
-    fi
-}
-
-function cert_key_check() {
-    SIZE=`du $TARGET_DIR/cert.pem | awk '{print $1}'`
-
-    if [ $SIZE -lt 1 ]; then
-        echo "Error downloading certificate (file size 0) ..."
-        exit 1
-    fi
-
-    SIZE=`du $TARGET_DIR/key.pem | awk '{print $1}'`
-
-    if [ $SIZE -lt 1 ]; then
-        echo "Error downloading key (file size 0) ..."
-        exit 1
-    fi
-}
-
-function ec2_tag() {
-    trap "exit" INT TERM EXIT
-
-    EC2=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL"`
+function ec2_find_tags() {
+    echo -n "Checking this is an ec2 environment..."
+    EC2=`curl -s --connect-timeout 5 "$EC2_INTERNAL"`
     exit_code=$?
 
     if [ "$exit_code" -eq "0" ]; then
-        # check to see if we *really* are on EC2
-        $CURL -is --connect-timeout 5 "$EC2_INTERNAL" | grep 'Server: EC2ws' > /dev/null
-        exit_code=$?
-
-        if [ "$exit_code" -eq "0" ]; then
-            echo -n "Auto generating ec2 tags for this meter...."
-        else
-            return 0
-        fi
+        echo "yes."
+        echo "Auto generating ec2 tags for this meter."
     else
+        echo "no."
         return 0
     fi
 
-    for tag in $TAGS; do
+    METERTAGS=ec2
+
+    for tag in $EC2_TAGS; do
         local AN_TAG
         local exit_code
 
-        AN_TAG=`$CURL -s --connect-timeout 5 "$EC2_INTERNAL/$tag"`
+        AN_TAG=`curl -s --connect-timeout 5 "$EC2_INTERNAL/$tag"`
         exit_code=$?
 
         # if the exit code is 7, that means curl couldnt connect so we can bail
@@ -434,62 +140,219 @@ function ec2_tag() {
 
         # it appears that an exit code of 28 is also a can't connect error
         if [ "$exit_code" -eq "28" ]; then
-            # do nothing
+             # do nothing
             return 0
         fi
 
-    # otherwise, maybe there was as timeout or something, skip that tag.
+        # otherwise, maybe there was as timeout or something, skip that tag.
         if [ "$exit_code" -ne "0" ]; then
             continue
         fi
 
         for an_tag in $AN_TAG; do
-            # create the tag
-            $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/$an_tag"
+            METERTAGS=$METERTAGS,$an_tag
         done
     done
 
-    $CURL -H "Content-Type: application/json" -s -u "$1:" -X PUT "$2/tags/ec2"
-    echo "done."
+    # extract additional tags if the commands and access variables are set
+    if [ -n "$EC2_DESC_TAGS" -a -n "$EC2_ACCESS_KEY" -a -n "$EC2_SECRET_KEY" -a -n "$EC2_URL" ]; then
+        for an_tag in `${EC2_DESC_TAGS} --filter "resource-id=\`curl -s http://169.254.169.254/latest/meta-data/instance-id\`" | grep -v Name | sed 's/[ \t]/ /g' | cut -d " " -f 5-`; do
+            METERTAGS=$METERTAGS,$an_tag
+        done
+    fi
+    echo Discovered ec2 tags: $METERTAGS
+}
+
+function check_distro_version() {
+    PLATFORM=$1
+    DISTRO=$2
+    VERSION=$3
+
+    TEMP="\${${DISTRO}_versions[*]}"
+    VERSIONS=`eval echo $TEMP`
+    VERSION_CMP=
+
+    if [ $DISTRO = "Ubuntu" ]; then
+        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+        MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
+        VERSION_CMP=$MAJOR_VERSION.$MINOR_VERSION
+
+    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+        VERSION_CMP=$MAJOR_VERSION
+
+    elif [ $DISTRO = "Amazon" ]; then
+        VERSION=`echo $PLATFORM | awk '{print $5}'`
+        # Some of these include minor numbers. Trim.
+        VERSION_CMP=${VERSION:0:7}
+
+    elif [ $DISTRO = "Debian" ]; then
+        MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
+        VERSION_CMP=$MAJOR_VERSION
+	else
+        VERSION_CMP=$VERSION
+    fi
+
+    TEMP="\${${DISTRO}_VERSIONS[*]}"
+    VERSIONS=`eval echo $TEMP`
+    for v in $VERSIONS ; do
+        if [ "$VERSION_CMP" = "$v" ]; then
+            return 0
+        fi
+    done
+
+    echo "Detected $DISTRO but with an untested version ($VERSION)"
+    return 1
+}
+
+function print_help() {
+    echo "   $0 [-s] -i ORGID:APIKEY"
+    echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
+    echo "          in the Account Settings in the Boundary WebUI."
+    echo "      -s: Install the latest testing meter from the staging repositories"
+    exit 0
+}
+
+function do_install() {
+    export INSTALLTOKEN="${APICREDS}"
+    export PROVISIONTAGS="${METERTAGS}"
+    if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+		APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
+		if [ "$DISTRO" = "Debian" ]; then
+			APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
+		fi
+        echo "Adding repository $APT_STRING"
+        sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
+
+        $CURL -s https://${APT}/APT-GPG-KEY-Boundary | apt-key add -
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://${APT}/APT-GPG-KEY-Boundary!"
+            exit 1
+        fi
+
+        echo "Updating apt repository cache..."
+        $APT_CMD update > /dev/null
+        $APT_CMD install bprobe
+        return $?
+
+    elif [ "$DISTRO" = "openSUSE" ]; then
+        ARCH_STR="x86_64/"
+
+        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary > RPM-GPG-KEY-Boundary
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+            exit 1
+        fi
+        rpm --import ./RPM-GPG-KEY-Boundary
+
+        echo "Adding repository http://${YUM}/opensuse/os/$VERSION/$ARCH_STR"
+        zypper addrepo -c -k -f -g http://${YUM}/opensuse/os/$VERSION/$ARCH_STR boundary
+
+        zypper install -y bprobe
+        return $?
+
+    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+        GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
+        if [ "$MACHINE" = "i686" ]; then
+            ARCH_STR="i386/"
+        elif [ "$MACHINE" = "x86_64" ]; then
+            ARCH_STR="x86_64/"
+        fi
+
+        # Amazon hack: we know the Amazon Linux AMIs are binary
+        # compatible with CentOS
+        if [ $DISTRO = "Amazon" ]; then
+            MAJOR_VERSION=6
+        fi
+
+        echo "Adding repository http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR"
+
+        sh -c "cat - > /etc/yum.repos.d/boundary.repo <<EOF
+[boundary]
+name=boundary
+baseurl=http://${YUM}/centos/os/$MAJOR_VERSION/$ARCH_STR
+gpgcheck=1
+gpgkey=file://$GPG_KEY_LOCATION
+enabled=1
+EOF"
+
+        $CURL -s https://$YUM/RPM-GPG-KEY-Boundary | tee /etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary > /dev/null
+        if [ $? -gt 0 ]; then
+            echo "Error downloading GPG key from https://$YUM/RPM-GPG-KEY-Boundary!"
+            exit 1
+        fi
+
+        $YUM_CMD install bprobe
+        return $?
+
+    elif [ "$DISTRO" = "SmartOS" ]; then
+      grep "http://${SMARTOS}/${MACHINE}" /opt/local/etc/pkgin/repositories.conf > /dev/null
+
+      if [ "$?" = "1" ]; then
+        echo "http://${SMARTOS}/${MACHINE}/" >> /opt/local/etc/pkgin/repositories.conf
+      fi
+
+      pkgin -fy up
+      pkgin -y install bprobe
+      # Enable promiscuous mode on SmartOS by default.
+      # Non-promiscuous mode is not very useful because the OS only forwards
+      # received traffic.
+      if [ -f /opt/local/etc/bprobe/bprobe.default -a ! -f /opt/local/etc/bprobe/bprobe.defaults ]; then
+          sed -e 's/PCAP_PROMISC=0/PCAP_PROMISC=1/' /opt/local/etc/bprobe/bprobe.default > /opt/local/etc/bprobe/bprobe.defaults
+          rm /opt/local/etc/bprobe/bprobe.default
+      fi
+      svccfg import /opt/custom/smf/boundary-meter.xml
+      svcadm enable boundary/meter
+      return $?
+
+    elif [ "$DISTRO" = "FreeBSD" ]; then
+        fetch "https://${FREEBSD}/${VERSION:0:3}/${MACHINE}/bprobe-current.tgz"
+        pkg_add bprobe-current.tgz
+    elif [ "$DISTRO" = "Gentoo" ]; then
+        if [ -e bprobe ]; then
+	    echo
+            echo "The installation script needs to create a 'bprobe' directory in the current"
+	    echo "working directory for installation to proceed. Please run this script from"
+	    echo "another location or remove the currently-existing 'bprobe' file or directory"
+	    echo "and try again."
+	    echo
+            return 1
+        fi
+        mkdir bprobe
+        (cd bprobe;
+         wget "http://${GENTOO}/engineyard/latest"
+         wget "http://${GENTOO}/engineyard/`cat latest`")
+        ebuild --skip-manifest bprobe/`cat bprobe/latest` merge
+        rm -fr bprobe
+    fi
 }
 
 function pre_install_sanity() {
-    SUDO=`which sudo`
-    if [ $? -ne 0 ]; then
-        echo "This script requires that sudo be installed and configured for your user."
-        echo "Please install sudo. For assistance, support@boundary.com"
-        exit 1
-    fi
-
     if [ $DISTRO = "SmartOS" ]; then
       TARGET_DIR="/opt/local/etc/bprobe"
     fi
 
     which curl > /dev/null
     if [ $? -gt 0 ]; then
-        echo "The 'curl' command is either not installed or not on the PATH ..."
+		echo "Installing curl ..."
 
-        if [ $DEPS = "true" ]; then
-            echo "Installing curl ..."
+		if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
+			echo "Updating apt repository cache..."
+			$APT_CMD update > /dev/null
+			$APT_CMD install curl
 
-            if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
-                echo "Updating apt repository cache..."
-                sudo $APT_CMD update > /dev/null
-                sudo $APT_CMD install curl
+		elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+			if [ "$MACHINE" = "i686" ]; then
+				$YUM_CMD install curl.i686
+			fi
 
-            elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ]; then
-                if [ $MACHINE = "i686" ]; then
-                    sudo $YUM_CMD install curl.i686
-                fi
+			if [ "$MACHINE" = "x86_64" ]; then
+				$YUM_CMD install curl.x86_64
+			fi
 
-                if [ $MACHINE = "x86_64" ]; then
-                    sudo $YUM_CMD install curl.x86_64
-                fi
-            fi
-        else
-            echo "To automatically install required components for Meter Install, rerun $0 with -d flag."
-            exit 1
-        fi
+		elif [ $DISTRO = "FreeBSD" ]; then
+			pkg_add -r curl
+		fi
     fi
 
     if [ $DISTRO = "SmartOS" ]; then
@@ -502,16 +365,10 @@ function pre_install_sanity() {
         test -f /usr/lib/apt/methods/https
         if [ $? -gt 0 ];then
             echo "apt-transport-https is not installed to access Boundary's HTTPS based APT repository ..."
-
-            if [ $DEPS = "true" ]; then
-                echo "Updating apt repository cache..."
-                sudo $APT_CMD update > /dev/null
-                echo "Installing apt-transport-https ..."
-                sudo $APT_CMD install apt-transport-https
-            else
-                echo "To automatically install required components for Meter Install, rerun $0 with -d flag."
-                exit 1
-            fi
+			echo "Updating apt repository cache..."
+			$APT_CMD update > /dev/null
+			echo "Installing apt-transport-https ..."
+			$APT_CMD install apt-transport-https
         fi
     fi
 }
@@ -520,17 +377,26 @@ function pre_install_sanity() {
 if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
     DISTRO=`echo $PLATFORM | awk '{print $1}'`
-    if [ "$DISTRO" != "CentOS" ]; then
-        if [ "$DISTRO" = "Red" ]; then
+    if [ "$DISTRO" = "Fedora" ]; then
+       DISTRO="RHEL"
+       VERSION="6"
+    else
+       if [ "$DISTRO" != "CentOS" ]; then
+           if [ "$DISTRO" = "Enterprise" ] || [ -f /etc/oracle-release ]; then
+                # Oracle "Enterprise Linux"/"Linux"
+                DISTRO="Oracle"
+                VERSION=`echo $PLATFORM | awk '{print $7}'`
+           elif [ "$DISTRO" = "Red" ]; then
                 DISTRO="RHEL"
                 VERSION=`echo $PLATFORM | awk '{print $7}'`
-        else
+           else
                 DISTRO="unknown"
                 PLATFORM="unknown"
                 VERSION="unknown"
-        fi
-    elif [ "$DISTRO" = "CentOS" ]; then
-        VERSION=`echo $PLATFORM | awk '{print $3}'`
+           fi
+       elif [ "$DISTRO" = "CentOS" ]; then
+           VERSION=`echo $PLATFORM | awk '{print $3}'`
+       fi
     fi
     MACHINE=`uname -m`
 elif [ -f /etc/system-release ]; then
@@ -545,12 +411,27 @@ elif [ -f /etc/lsb-release ] ; then
     DISTRO=$DISTRIB_ID
     VERSION=$DISTRIB_RELEASE
     MACHINE=`uname -m`
+    if [ "$DISTRO" = "LinuxMint" ]; then
+       DISTRO="Ubuntu"
+       VERSION="12.04"
+    fi
 elif [ -f /etc/debian_version ] ; then
     #Debian Version /etc/debian_version - Source: http://www.debian.org/doc/manuals/debian-faq/ch-software.en.html#s-isitdebian
     DISTRO="Debian"
     VERSION=`cat /etc/debian_version`
     INFO="$DISTRO $VERSION"
     PLATFORM=$INFO
+    MACHINE=`uname -m`
+elif [ -f /etc/os-release ] ; then
+    . /etc/os-release
+    PLATFORM=$PRETTY_NAME
+    DISTRO=$NAME
+    VERSION=$VERSION_ID
+    MACHINE=`uname -m`
+elif [ -f /etc/gentoo-release ] ; then
+    PLATFORM="Gentoo"
+    DISTRO="Gentoo"
+    VERSION=`cat /etc/gentoo-release | cut -d ' ' -f 5`
     MACHINE=`uname -m`
 else
     PLATFORM=`uname -sv | grep 'SunOS joyent'` > /dev/null
@@ -567,21 +448,43 @@ else
         VERSION=`grep 'Image' /etc/product | awk '{ print $3}' | awk -F. '{print $1}'`
       fi
     elif [ "$?" != "0" ]; then
-        PLATFORM="unknown"
-        DISTRO="unknown"
-        MACHINE=`uname -m`
+        uname -sv | grep 'FreeBSD' > /dev/null
+        if [ "$?" = "0" ]; then
+            PLATFORM="FreeBSD"
+            DISTRO="FreeBSD"
+            VERSION=`uname -r`
+            MACHINE=`uname -m`
+        else
+            uname -sv | grep 'Darwin' > /dev/null
+            if [ "$?" = "0" ]; then
+                PLATFORM="Darwin"
+                DISTRO="OS X"
+                VERSION=`uname -r`
+                MACHINE=`uname -m`
+            fi
+        fi
     fi
 fi
 
-echo "Detected $DISTRO $VERSION..."
-echo ""
-
-while getopts "hdsi:" opts; do
+while getopts "hdsi:f:" opts; do
     case $opts in
         h) print_help;;
-        d) DEPS="true";;
         s) STAGING="true";;
         i) APICREDS="$OPTARG";;
+        f) echo "WARNING! You are OVERRIDING this script's OS detection."
+           echo "On unsupported platforms, your mileage may vary!"
+           print_supported_platforms
+           echo "Please contact support@boundary.com to request support for your architecture."
+
+           # This takes input basically of the form "OS VERSION" for the OS
+           # you're mimicking.
+           # E.g., "CentOS 6.2", "Ubuntu 11.10", etc.
+           PLATFORM="$OPTARG"
+           DISTRO=`echo $PLATFORM | awk '{print $1}'`
+           VERSION=`echo $PLATFORM | awk '{print $2}'`
+
+           echo "Script will masquerade as \"$PLATFORM\""
+           ;;
         [?]) print_help;;
     esac
 done
@@ -590,19 +493,13 @@ if [ $STAGING = "true" ]; then
     APT="apt-staging.boundary.com"
     YUM="yum-staging.boundary.com"
     SMARTOS="smartos-staging.boundary.com"
+    FREEBSD="freebsd-staging.boundary.com"
+    GENTOO="gentoo-staging.boundary.com"
 fi
 
-if [ -z $APICREDS ]; then
-    print_help
-fi
-
-
-APIID=`echo $APICREDS | awk -F: '{print $1}'`
-APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
-
-if [ $MACHINE = "i686" ] ||
-   [ $MACHINE = "i586" ] ||
-   [ $MACHINE = "i386" ] ; then
+if [ "$MACHINE" = "i686" ] ||
+   [ "$MACHINE" = "i586" ] ||
+   [ "$MACHINE" = "i386" ] ; then
     ARCH="32"
     SUPPORTED_ARCH=1
 fi
@@ -612,16 +509,16 @@ if [[ "$MACHINE" == arm* ]] ; then
 	if [ -x /usr/bin/readelf ] ; then
 		HARDFLOAT=`readelf -a /proc/self/exe | grep armhf`
 		if [ -z "$HARDFLOAT" ]; then
-			if [ $MACHINE = "armv7l" ] ||
-			   [ $MACHINE = "armv6l" ] ||
-			   [ $MACHINE = "armv5tel" ] ||
-			   [ $MACHINE = "armv5tejl" ] ; then
+			if [ "$MACHINE" = "armv7l" ] ||
+			   [ "$MACHINE" = "armv6l" ] ||
+			   [ "$MACHINE" = "armv5tel" ] ||
+			   [ "$MACHINE" = "armv5tejl" ] ; then
 				ARCH="32"
 				SUPPORTED_ARCH=1
 				echo "Detected $MACHINE running armel"
 			fi
 		else
-			if [ $MACHINE = "armv7l" ] ; then
+			if [ "$MACHINE" = "armv7l" ] ; then
 				ARCH="32"
 				SUPPORTED_ARCH=1
 				echo "Detected $MACHINE running armhf"
@@ -634,7 +531,7 @@ if [[ "$MACHINE" == arm* ]] ; then
 	fi
 fi
 
-if [ $MACHINE = "x86_64" ] || [ $MACHINE = "amd64" ]; then
+if [ "$MACHINE" = "x86_64" ] || [ "$MACHINE" = "amd64" ]; then
     ARCH="64"
     SUPPORTED_ARCH=1
 fi
@@ -648,16 +545,50 @@ fi
 
 # Check the distribution
 for d in ${PLATFORMS[*]} ; do
-    if [ $DISTRO = $d ]; then
+    if [ "$DISTRO" = "$d" ]; then
         SUPPORTED_PLATFORM=1
         break
     fi
 done
 if [ $SUPPORTED_PLATFORM -eq 0 ]; then
-    echo "Your platform is not supported."
+    echo "Your platform is not supported by this script at this time."
+	echo "Please check https://app.boundary.com/docs/meter_install for alternate installation instructions."
     print_supported_platforms
-    exit 0
+    exit 1
 fi
+
+
+APIID=`echo $APICREDS | awk -F: '{print $1}'`
+APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
+if [ "${#APIID}" -lt 10 -o "${#APIKEY}" -lt 10 ]; then
+	echo "Please enter a valid installation token"
+	echo "Expected APIID:APIKEY, got: '${APICREDS}'"
+	echo
+
+	print_help
+fi
+
+if [ -z $APICREDS ]; then
+    print_help
+fi
+
+# If this script is being run by root for some reason, don't use sudo.
+if [ "$(id -u)" != "0" ]; then
+	SUDO=`which sudo`
+	if [ $? -ne 0 ]; then
+		echo "This script must be executed as the 'root' user or with sudo"
+		echo "in order to install the Boundary meter."
+		echo
+		echo "Please install sudo or run again as the 'root' user."
+		echo "For assistance, support@boundary.com"
+		exit 1
+	else
+		sudo -E $0 $@
+		exit 0
+	fi
+fi
+
+echo "Detected $DISTRO $VERSION..."
 
 # Check the version number
 UNSUPPORTED_RELEASE=0
@@ -685,44 +616,14 @@ fi
 # At this point, we think we have a supported OS.
 pre_install_sanity $d $v
 
-METER_LOCATION=`create_meter $APIKEY $APIID`
-
-if [ $? -gt 0 ]; then
-    echo "Error creating meter:"
-    echo "$METER_LOCATION"
-    echo "Please contact support@boundary.com"
-    exit 1
-fi
-
-KEY_CERT=`setup_cert_key $APIKEY $METER_LOCATION`
-if [ $? -eq 1 ]; then
-    echo "Error setting up cert and/or key ..."
-    echo "Please contact support@boundary.com"
-    echo $KEY_CERT
-    exit 1
-fi
-
-CERT_KEY_CHECK=`cert_key_check`
-
-if [ $? -eq 1 ]; then
-    echo "Error setting up cert and/or key ..."
-    echo "Please contact support@boundary.com"
-    echo $CERT_KEY_CHECK
-    exit 1
-fi
-
-ec2_tag $APIKEY $METER_LOCATION
+ec2_find_tags
 
 do_install
 
 if [ $? -ne 0 ]; then
-    echo "I added the correct repositories, but the meter installation failed."
-    echo "Please contact support@boundary.com about this problem."
+    echo "The meter installation failed."
+    echo "For help, please contact support@boundary.com describing the problem."
     exit 1
-fi
-
-if [ -n "$CACERTS" ]; then
-  rm -f $CACERTS
 fi
 
 echo ""
