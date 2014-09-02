@@ -79,6 +79,9 @@ YUM_CMD="yum -d0 -e0 -y"
 
 STAGING="false"
 
+FEATURES=""
+DEFEATURES=""
+
 trap "exit" INT TERM EXIT
 
 function print_supported_platforms() {
@@ -216,16 +219,20 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "   $0 [-s] -i ORGID:APIKEY"
+    echo "   $0 [-s] -i ORGID:APIKEY [--enable-flow-metrics] [--enable-server-metrics]"
     echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
     echo "          in the Account Settings in the Boundary WebUI."
     echo "      -s: Install the latest testing meter from the staging repositories"
+    echo "      --enable-flow-metrics: Enable the reporting of network flow metrics (default)"
+    echo "      --enable-server-metrics: Enable the reporting of host level metrics"
     exit 0
 }
 
 function do_install() {
     export INSTALLTOKEN="${APICREDS}"
     export PROVISIONTAGS="${METERTAGS}"
+    export PROVISIONFEATURES="${FEATURES}"
+    export PROVISIONDEFEATURES="${DEFEATURES}"
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
         APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
         if [ "$DISTRO" = "Debian" ]; then
@@ -453,7 +460,7 @@ else
     fi
 fi
 
-while getopts "hdsi:f:" opts; do
+while getopts "hdsi:f:-:" opts; do
     case $opts in
         h) print_help;;
         s) STAGING="true";;
@@ -471,6 +478,17 @@ while getopts "hdsi:f:" opts; do
            VERSION=`echo $PLATFORM | awk '{print $2}'`
 
            echo "Script will masquerade as \"$PLATFORM\""
+           ;;
+        -) if [ "${OPTARG}" = "enable-flow-metrics" -o "${OPTARG}" = "enable-server-metrics" ]; then
+              if [ -z "${FEATURES}" ]; then
+                  FEATURES="${OPTARG}"
+              else
+                  FEATURES="${FEATURES},${OPTARG}"
+              fi
+           else
+              echo "Error: unrecognized option '--${OPTARG}'"
+              echo print_help
+           fi
            ;;
         [?]) print_help;;
     esac
