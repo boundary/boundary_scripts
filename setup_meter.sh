@@ -313,8 +313,8 @@ EOF"
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        fetch "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz"
-        pkg add -f boundary-meter-current.txz
+        curl -s "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz" > boundary-meter-current.txz
+        pkg add boundary-meter-current.txz
 
     elif [ "$DISTRO" = "Gentoo" ]; then
         if [ -e boundary-meter ]; then
