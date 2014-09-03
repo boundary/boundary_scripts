@@ -493,7 +493,7 @@ while getopts "hdsi:f:-:" opts; do
         -) if [ "${OPTARG}" = "enable-flow-metrics" ]; then
               ENABLE_FLOW_METRICS="flow_metrics"
            elif [ "${OPTARG}" = "enable-server-metrics" ]; then
-              ENABLE_SERVER_METRICS="host_level_metrics"
+              ENABLE_SERVER_METRICS="server_metrics"
            elif [ "${OPTARG}" = "disable-metrics" ]; then
               ENABLE_FLOW_METRICS=""
               ENABLE_SERVER_METRICS=""
