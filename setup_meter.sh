@@ -79,7 +79,7 @@ YUM_CMD="yum -d0 -e0 -y"
 
 STAGING="false"
 
-FEATURES=""
+FEATURES="flow_metrics"
 DEFEATURES=""
 
 trap "exit" INT TERM EXIT
@@ -225,6 +225,7 @@ function print_help() {
     echo "      -s: Install the latest testing meter from the staging repositories"
     echo "      --enable-flow-metrics: Enable the reporting of network flow metrics (default)"
     echo "      --enable-server-metrics: Enable the reporting of host level metrics"
+    echo "      --disable-metrics: Disable reporting of all metrics"
     exit 0
 }
 
@@ -374,6 +375,14 @@ function pre_install_sanity() {
     fi
 }
 
+function update_features() {
+    if [ -z "${FEATURES}" ]; then
+        FEATURES="${1}"
+    else
+        FEATURES="${FEATURES},${1}"
+    fi
+}
+
 # Grab some system information
 if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
@@ -460,6 +469,8 @@ else
     fi
 fi
 
+ENABLE_FLOW_METRICS=""
+ENABLE_SERVER_METRICS=""
 while getopts "hdsi:f:-:" opts; do
     case $opts in
         h) print_help;;
@@ -479,12 +490,14 @@ while getopts "hdsi:f:-:" opts; do
 
            echo "Script will masquerade as \"$PLATFORM\""
            ;;
-        -) if [ "${OPTARG}" = "enable-flow-metrics" -o "${OPTARG}" = "enable-server-metrics" ]; then
-              if [ -z "${FEATURES}" ]; then
-                  FEATURES="${OPTARG}"
-              else
-                  FEATURES="${FEATURES},${OPTARG}"
-              fi
+        -) if [ "${OPTARG}" = "enable-flow-metrics" ]; then
+              ENABLE_FLOW_METRICS="flow_metrics"
+           elif [ "${OPTARG}" = "enable-server-metrics" ]; then
+              ENABLE_SERVER_METRICS="host_level_metrics"
+           elif [ "${OPTARG}" = "disable-metrics" ]; then
+              ENABLE_FLOW_METRICS=""
+              ENABLE_SERVER_METRICS=""
+              FEATURES=""
            else
               echo "Error: unrecognized option '--${OPTARG}'"
               echo print_help
@@ -493,6 +506,17 @@ while getopts "hdsi:f:-:" opts; do
         [?]) print_help;;
     esac
 done
+
+if [ -n "${ENABLE_FLOW_METRICS}" -o -n "${ENABLE_SERVER_METRICS}" ]; then
+    FEATURES=""
+    for f in ${ENABLE_FLOW_METRICS} ${ENABLE_SERVER_METRICS}; do
+        if [ -n "${FEATURES}" ]; then
+            FEATURES="${FEATURES},${f}"
+        else
+            FEATURES=${f}
+        fi
+    done
+fi
 
 if [ $STAGING = "true" ]; then
     APT="apt-staging.boundary.com"
