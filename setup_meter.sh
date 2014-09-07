@@ -26,7 +26,7 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "Free
 # the tags in $PLATFORMS
 Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10" "14.04")
 Debian_VERSIONS=("5" "6" "7")
-CentOS_VERSIONS=("5" "6")
+CentOS_VERSIONS=("5" "6" "7")
 Amazon_VERSIONS=("2012.09" "2013.03")
 RHEL_VERSIONS=("5" "6")
 SmartOS_VERSIONS=("1" "12" "13")
@@ -57,6 +57,7 @@ map Debian 6 squeeze
 map Debian 7 wheezy
 map RHEL 5 Tikanga
 map RHEL 6 Santiago
+map RHEL 7 Maipo
 
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
@@ -408,7 +409,12 @@ if [ -f /etc/redhat-release ] ; then
                 VERSION="unknown"
            fi
        elif [ "$DISTRO" = "CentOS" ]; then
-           VERSION=`echo $PLATFORM | awk '{print $3}'`
+           if [ "`echo $PLATFORM | awk '{print $2}'`" = "Linux" ]; then
+                # CentOS 7 now includes "Linux" in the release string...
+                VERSION=`echo $PLATFORM | awk '{print $4}'`
+           else
+                VERSION=`echo $PLATFORM | awk '{print $3}'`
+           fi
        fi
     fi
     MACHINE=`uname -m`
