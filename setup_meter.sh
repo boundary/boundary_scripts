@@ -28,14 +28,14 @@ Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10"
 Debian_VERSIONS=("5" "6" "7")
 CentOS_VERSIONS=("5" "6" "7")
 Amazon_VERSIONS=("2012.09" "2013.03")
-RHEL_VERSIONS=("5" "6")
+RHEL_VERSIONS=("5" "6" "7")
 SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
 FreeBSD_VERSIONS=("9.0-RELEASE 9.1-RELEASE 9.2-RELEASE 10.0-RELEASE")
 LinuxMint_VERSIONS=("13", "14", "15", "16")
 Gentoo_VERSIONS=("1.12.11.1")
-Oracle_VERSIONS=("5" "6")
-Scientific_VERSIONS=("6")
+Oracle_VERSIONS=("5" "6" "7")
+Scientific_VERSIONS=("6" "7")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
