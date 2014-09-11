@@ -62,8 +62,13 @@ map RHEL 7 Maipo
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
 
-APIHOST="api.boundary.com"
 APICREDS=
+# API 'enterprise' host and cred/token
+APIHOST_ENT="api.boundary.com"
+APICREDS_ENT=
+# API 'premium' host and cred/token
+APIHOST_PRE="api.graphdat.com"
+APICREDS_PRE=
 
 METERTAGS=
 
@@ -221,9 +226,17 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "   $0 [-s] -i ORGID:APIKEY [--enable-flow-metrics] [--enable-server-metrics]"
-    echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
-    echo "          in the Account Settings in the Boundary WebUI."
+    echo "   $0 [-s] -i <API token>[,<API token>] [--enable-flow-metrics] [--enable-server-metrics]"
+    echo "      -i: Required input for authentication. The API token can be one (or both) of"
+    echo "          the following:"
+    echo
+    echo "              - Boundary Premium"
+    echo "                  The API token is api.XXXXXXXXXX-XXXX:<email address>, which can be found in"
+    echo "                  'Settings->Account' as 'Your API token' and 'Owner' in the Boundary Premium WebUI."
+    echo "              - Boundary Enterprise"
+    echo "                  The API token is ORGID:APIKEY, which can be found in"
+    echo "                  Account Settings in the Boundary Enterprise WebUI."
+    echo
     echo "      -s: Install the latest testing meter from the staging repositories"
     echo "      --enable-flow-metrics: Enable the reporting of network flow metrics (default)"
     echo "      --enable-server-metrics: Enable the reporting of host level metrics"
@@ -232,7 +245,9 @@ function print_help() {
 }
 
 function do_install() {
+    # export 'enterprise' and 'premium' tokens to the environment...
     export INSTALLTOKEN="${APICREDS}"
+    export INSTALLTOKENS="${APICREDS}"
     export PROVISIONTAGS="${METERTAGS}"
     export PROVISIONFEATURES="${FEATURES}"
     export PROVISIONDEFEATURES="${DEFEATURES}"
@@ -484,7 +499,16 @@ while getopts "hdsi:f:-:" opts; do
     case $opts in
         h) print_help;;
         s) STAGING="true";;
-        i) APICREDS="$OPTARG";;
+        i) APICREDS="$OPTARG"
+           for i in `echo $APICREDS|sed 's/,/ /g'`; do
+              if [ -n "`echo $i | sed -n '/^api/p'`" ]; then
+                 if [ -z "$APICREDS_PRE" ]; then
+                    APICREDS_PRE=`echo $i | sed -n '/^api/p'`
+                 fi
+              elif [ -z "$APICREDS_ENT" ]; then
+                 APICREDS_ENT=`echo $i | sed -n '/:/p'`
+              fi
+           done;;
         f) echo "WARNING! You are OVERRIDING this script's OS detection."
            echo "On unsupported platforms, your mileage may vary!"
            print_supported_platforms
@@ -595,19 +619,33 @@ if [ $SUPPORTED_PLATFORM -eq 0 ]; then
     exit 1
 fi
 
-
-APIID=`echo $APICREDS | awk -F: '{print $1}'`
-APIKEY=`echo $APICREDS | awk -F: '{print $2}'`
-if [ "${#APIID}" -lt 10 -o "${#APIKEY}" -lt 10 ]; then
-    echo "Please enter a valid installation token"
-    echo "Expected APIID:APIKEY, got: '${APICREDS}'"
-    echo
-
+if [ -z "$APICREDS" ]; then
     print_help
 fi
 
-if [ -z $APICREDS ]; then
-    print_help
+if [ -n "$APICREDS_ENT" ]; then
+    APIID=`echo $APICREDS_ENT | awk -F: '{print $1}'`
+    APIKEY=`echo $APICREDS_ENT | awk -F: '{print $2}'`
+    if [ "${#APIID}" -lt 10 -o "${#APIKEY}" -lt 10 ]; then
+        echo "Please enter a valid Boundary Enterprise installation token"
+        echo "Expected APIID:APIKEY, got: '${APICREDS_ENT}'"
+        echo
+
+        print_help
+    fi
+fi
+
+if [ -n "$APICREDS_PRE" ]; then
+    APITOKEN=`echo $APICREDS_PRE | awk -F: '{print $1}'`
+    APIEMAIL=`echo $APICREDS_PRE | awk -F: '{print $2}'`
+    if [ -z "`echo ${APITOKEN} | sed -n '/api\.[0-9a-fA-F]\+-[0-9]\+$/p'`" -o \
+            -z "`echo ${APIEMAIL} | sed -n '/.\+@.\+\..\+/p'`" ]; then
+        echo "Please enter a valid Boundary Premium installation token"
+        echo "Expected APITOKEN:APIEMAIL, got: '${APICREDS_PRE}'"
+        echo
+
+        print_help
+    fi
 fi
 
 # If this script is being run by root for some reason, don't use sudo.
