@@ -19,22 +19,23 @@ set -o pipefail
 
 SCRIPT_NAME=${0}
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle" "Scientific")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
 Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10" "14.04")
 Debian_VERSIONS=("5" "6" "7")
-CentOS_VERSIONS=("5" "6")
+CentOS_VERSIONS=("5" "6" "7")
 Amazon_VERSIONS=("2012.09" "2013.03")
-RHEL_VERSIONS=("5" "6")
+RHEL_VERSIONS=("5" "6" "7")
 SmartOS_VERSIONS=("1" "12" "13")
 openSUSE_VERSIONS=("12.1" "12.3" "13.1")
 FreeBSD_VERSIONS=("9.0-RELEASE 9.1-RELEASE 9.2-RELEASE 10.0-RELEASE")
 LinuxMint_VERSIONS=("13", "14", "15", "16")
 Gentoo_VERSIONS=("1.12.11.1")
-Oracle_VERSIONS=("5" "6")
+Oracle_VERSIONS=("5" "6" "7")
+Scientific_VERSIONS=("6" "7")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -56,6 +57,7 @@ map Debian 6 squeeze
 map Debian 7 wheezy
 map RHEL 5 Tikanga
 map RHEL 6 Santiago
+map RHEL 7 Maipo
 
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
@@ -78,6 +80,9 @@ APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
 
 STAGING="false"
+
+FEATURES="flow_metrics"
+DEFEATURES=""
 
 trap "exit" INT TERM EXIT
 
@@ -186,7 +191,7 @@ function check_distro_version() {
         MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
         VERSION_CMP=$MAJOR_VERSION.$MINOR_VERSION
 
-    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+    elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ] || [ $DISTRO = "Scientific" ]; then
         MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
         VERSION_CMP=$MAJOR_VERSION
 
@@ -216,16 +221,21 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "   $0 [-s] -i ORGID:APIKEY"
+    echo "   $0 [-s] -i ORGID:APIKEY [--enable-flow-metrics] [--enable-server-metrics]"
     echo "      -i: Required input for authentication. The ORGID and APIKEY can be found"
     echo "          in the Account Settings in the Boundary WebUI."
     echo "      -s: Install the latest testing meter from the staging repositories"
+    echo "      --enable-flow-metrics: Enable the reporting of network flow metrics (default)"
+    echo "      --enable-server-metrics: Enable the reporting of host level metrics"
+    echo "      --disable-metrics: Disable reporting of all metrics"
     exit 0
 }
 
 function do_install() {
     export INSTALLTOKEN="${APICREDS}"
     export PROVISIONTAGS="${METERTAGS}"
+    export PROVISIONFEATURES="${FEATURES}"
+    export PROVISIONDEFEATURES="${DEFEATURES}"
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
         APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
         if [ "$DISTRO" = "Debian" ]; then
@@ -262,7 +272,7 @@ function do_install() {
         zypper install -f -y boundary-meter
         return $?
 
-    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+    elif [ "$DISTRO" = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ] || [ $DISTRO = "Scientific" ]; then
         GPG_KEY_LOCATION=/etc/pki/rpm-gpg/RPM-GPG-KEY-Boundary
         if [ "$MACHINE" = "i686" ]; then
             ARCH_STR="i386/"
@@ -305,8 +315,8 @@ EOF"
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        fetch "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz"
-        pkg add -f boundary-meter-current.txz
+        curl -s "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz" > boundary-meter-current.txz
+        pkg add boundary-meter-current.txz
 
     elif [ "$DISTRO" = "Gentoo" ]; then
         if [ -e boundary-meter ]; then
@@ -337,7 +347,7 @@ function pre_install_sanity() {
             $APT_CMD update > /dev/null
             $APT_CMD install curl
 
-        elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ]; then
+        elif [ $DISTRO = "CentOS" ] || [ $DISTRO = "Amazon" ] || [ $DISTRO = "RHEL" ] || [ $DISTRO = "Oracle" ] || [ $DISTRO = "Scientific" ]; then
             if [ "$MACHINE" = "i686" ]; then
                 $YUM_CMD install curl.i686
             elif [ "$MACHINE" = "x86_64" ]; then
@@ -367,6 +377,14 @@ function pre_install_sanity() {
     fi
 }
 
+function update_features() {
+    if [ -z "${FEATURES}" ]; then
+        FEATURES="${1}"
+    else
+        FEATURES="${FEATURES},${1}"
+    fi
+}
+
 # Grab some system information
 if [ -f /etc/redhat-release ] ; then
     PLATFORM=`cat /etc/redhat-release`
@@ -383,13 +401,20 @@ if [ -f /etc/redhat-release ] ; then
            elif [ "$DISTRO" = "Red" ]; then
                 DISTRO="RHEL"
                 VERSION=`echo $PLATFORM | awk '{print $7}'`
+           elif [ "$DISTRO" = "Scientific" ]; then
+                VERSION=`echo $PLATFORM | awk '{print $4}'`
            else
                 DISTRO="unknown"
                 PLATFORM="unknown"
                 VERSION="unknown"
            fi
        elif [ "$DISTRO" = "CentOS" ]; then
-           VERSION=`echo $PLATFORM | awk '{print $3}'`
+           if [ "`echo $PLATFORM | awk '{print $2}'`" = "Linux" ]; then
+                # CentOS 7 now includes "Linux" in the release string...
+                VERSION=`echo $PLATFORM | awk '{print $4}'`
+           else
+                VERSION=`echo $PLATFORM | awk '{print $3}'`
+           fi
        fi
     fi
     MACHINE=`uname -m`
@@ -453,7 +478,9 @@ else
     fi
 fi
 
-while getopts "hdsi:f:" opts; do
+ENABLE_FLOW_METRICS=""
+ENABLE_SERVER_METRICS=""
+while getopts "hdsi:f:-:" opts; do
     case $opts in
         h) print_help;;
         s) STAGING="true";;
@@ -472,9 +499,33 @@ while getopts "hdsi:f:" opts; do
 
            echo "Script will masquerade as \"$PLATFORM\""
            ;;
+        -) if [ "${OPTARG}" = "enable-flow-metrics" ]; then
+              ENABLE_FLOW_METRICS="flow_metrics"
+           elif [ "${OPTARG}" = "enable-server-metrics" ]; then
+              ENABLE_SERVER_METRICS="server_metrics"
+           elif [ "${OPTARG}" = "disable-metrics" ]; then
+              ENABLE_FLOW_METRICS=""
+              ENABLE_SERVER_METRICS=""
+              FEATURES=""
+           else
+              echo "Error: unrecognized option '--${OPTARG}'"
+              echo print_help
+           fi
+           ;;
         [?]) print_help;;
     esac
 done
+
+if [ -n "${ENABLE_FLOW_METRICS}" -o -n "${ENABLE_SERVER_METRICS}" ]; then
+    FEATURES=""
+    for f in ${ENABLE_FLOW_METRICS} ${ENABLE_SERVER_METRICS}; do
+        if [ -n "${FEATURES}" ]; then
+            FEATURES="${FEATURES},${f}"
+        else
+            FEATURES=${f}
+        fi
+    done
+fi
 
 if [ $STAGING = "true" ]; then
     APT="apt-staging.boundary.com"
