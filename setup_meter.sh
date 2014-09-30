@@ -17,8 +17,6 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-SCRIPT_NAME=${0}
-
 PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle" "Scientific")
 
 # Put additional version numbers here.
@@ -62,6 +60,7 @@ map RHEL 7 Maipo
 # For version number updates you hopefully don't need to modify below this line
 # -----------------------------------------------------------------------------
 
+SCRIPTNAME="$(basename ${0})"
 APICREDS=
 # API 'enterprise' host and cred/token
 APIHOST_ENT="api.boundary.com"
@@ -104,6 +103,29 @@ function print_supported_platforms() {
         done
         echo ""
     done
+}
+
+function print_pgp_key() {
+    cat <<-EOF
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+
+mQENBE3WllEBCADlEuA7DCcI0B1/1rXJ4SzzQGXcHwmsxLVGnRR9FX4Fu3oCz4sc
+18/FkPHb2AwFfClv4xH6gOUBJVCDyub/C6PJeLolkc51SLA2lO3y5e3OpJ7uC8Ln
+/P5AC96FDhIEPH+vVnBVxgYRFj/1vDlqUcJXUSN3ZnLxzHwnHJ+lATNydbTi3ltL
+Kr53YOD5FmuKpc2hkNzT+9Lg1/aVEKXpnSjzlNT/1VIrXgJOzv/xyKvpSD2fb5M3
+QZMjEkrod5botvclt/y6P8LNWsmlG0eM+JiewnDzwJ3OnhekSzHqoh3kVKQ3YJed
+i1ZKInNthXQ5sSiHrsxHhJFGuVAQVA0/AmJfABEBAAG0G0JvdW5kYXJ5IDxvcHNA
+Ym91bmRhcnkuY29tPokBOAQTAQIAIgUCTdaWUQIbAwYLCQgHAwIGFQgCCQoLBBYC
+AwECHgECF4AACgkQQ4Go5GUyzCAqWggAjuJgzEYO1nTVd4hBhkhuxH1d/9R5eDzN
+SvxMk9gI2kKd71DsVP7PCVlPPIkzqL/IMv5ffO3me3R0S3bZzquhCOhrUc987GgZ
++rPEcb0sDjT4fzcVeAOuaIf3T8oysx9ngB5pE4i3fatD43WvTGbj4LmU9XxiwZ6z
+AKzIYltGy/+Cq2JJjYgg80O2RmG8FFf8k/FujkbsNgNICQwWnAGKKlpJ4b65M5zu
+oNNUGFcJopGGufKLxXAiRwJqOx8a+EvD7/MEs5VYQJGeBgoaE6ZgXwufYJYn0Lv3
+6fxTtkLlIrD27gvTbV1oF8tj+T+7ayKj75YGnaH03QYBOG8tmbqV/A==
+=p4gi
+-----END PGP PUBLIC KEY BLOCK-----
+EOF
 }
 
 EC2_INTERNAL="http://169.254.169.254/latest/meta-data"
@@ -226,7 +248,10 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "   $0 [-s] -i <API token>[,<API token>] [--enable-flow-metrics] [--enable-server-metrics]"
+    echo "${SCRIPTNAME} [-s] -i <API token>[,<API token>] [--enable-flow-metrics] [--enable-server-metrics]"
+    i=0; while [ ${i} -le ${#SCRIPTNAME} ]; do echo -n " "; i=$((i + 1)); done
+    echo "[--gd-relay-file <config filename>]"
+    echo
     echo "      -i: Required input for authentication. The API token can be one (or both) of"
     echo "          the following:"
     echo
@@ -238,9 +263,12 @@ function print_help() {
     echo "                  Account Settings in the Boundary Enterprise WebUI."
     echo
     echo "      -s: Install the latest testing meter from the staging repositories"
+    echo
     echo "      --enable-flow-metrics: Enable the reporting of network flow metrics (default)"
     echo "      --enable-server-metrics: Enable the reporting of host level metrics"
     echo "      --disable-metrics: Disable reporting of all metrics"
+    echo
+    echo "      --gd-relay-file <config filename>: Import GD relay settings from existing relay 'config.json' config file"
     exit 0
 }
 
@@ -251,6 +279,7 @@ function do_install() {
     export PROVISIONTAGS="${METERTAGS}"
     export PROVISIONFEATURES="${FEATURES}"
     export PROVISIONDEFEATURES="${DEFEATURES}"
+    export GDRELAYFILE="${GDRELAYFILE}"
     if [ "$DISTRO" = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
         APT_STRING="deb https://${APT}/ubuntu/ `get $DISTRO $MAJOR_VERSION.$MINOR_VERSION` universe"
         if [ "$DISTRO" = "Debian" ]; then
@@ -259,7 +288,7 @@ function do_install() {
         echo "Adding repository $APT_STRING"
         sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
-        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} | apt-key add -
+        print_pgp_key | apt-key add -
         if [ $? -gt 0 ]; then
             echo "Error adding Boundary GPG key to list of trusted keys!"
             exit 1
@@ -274,7 +303,7 @@ function do_install() {
         GPG_KEY_LOCATION=/tmp/RPM-GPG-KEY-Boundary
         ARCH_STR="x86_64/"
 
-        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} > ${GPG_KEY_LOCATION}
+        print_pgp_key > ${GPG_KEY_LOCATION}
         rpm --import ${GPG_KEY_LOCATION}
         if [ $? -gt 0 ]; then
             echo "Error adding Boundary GPG key to list of trusted keys!"
@@ -312,7 +341,7 @@ gpgkey=file://$GPG_KEY_LOCATION
 enabled=1
 EOF"
 
-        sed '0,/^===== DO NOT MODIFY THIS LINE OR BELOW =====/d' ${SCRIPT_NAME} > ${GPG_KEY_LOCATION}
+        print_pgp_key > ${GPG_KEY_LOCATION}
         $YUM_CMD install boundary-meter
         return $?
 
@@ -390,6 +419,18 @@ function pre_install_sanity() {
             $APT_CMD install apt-transport-https
         fi
     fi
+}
+
+function update_api_creds() {
+    for i in `echo $APICREDS|sed 's/,/ /g'`; do
+        if [ -n "`echo $i | sed -n '/^api/p'`" ]; then
+            if [ -z "$APICREDS_PRE" ]; then
+                APICREDS_PRE=`echo $i | sed -n '/^api/p'`
+            fi
+        elif [ -z "$APICREDS_ENT" ]; then
+            APICREDS_ENT=`echo $i | sed -n '/:/p'`
+        fi
+    done
 }
 
 function update_features() {
@@ -495,50 +536,60 @@ fi
 
 ENABLE_FLOW_METRICS=""
 ENABLE_SERVER_METRICS=""
+GDRELAYFILE=""
 while getopts "hdsi:f:-:" opts; do
     case $opts in
-        h) print_help;;
-        s) STAGING="true";;
-        i) APICREDS="$OPTARG"
-           for i in `echo $APICREDS|sed 's/,/ /g'`; do
-              if [ -n "`echo $i | sed -n '/^api/p'`" ]; then
-                 if [ -z "$APICREDS_PRE" ]; then
-                    APICREDS_PRE=`echo $i | sed -n '/^api/p'`
-                 fi
-              elif [ -z "$APICREDS_ENT" ]; then
-                 APICREDS_ENT=`echo $i | sed -n '/:/p'`
-              fi
-           done;;
-        f) echo "WARNING! You are OVERRIDING this script's OS detection."
-           echo "On unsupported platforms, your mileage may vary!"
-           print_supported_platforms
-           echo "Please contact support@boundary.com to request support for your architecture."
+        h)  print_help;;
+        s)  STAGING="true";;
+        i)  APICREDS="$OPTARG";;
+        f)  echo "WARNING! You are OVERRIDING this script's OS detection."
+            echo "On unsupported platforms, your mileage may vary!"
+            print_supported_platforms
+            echo "Please contact support@boundary.com to request support for your architecture."
 
-           # This takes input basically of the form "OS VERSION" for the OS
-           # you're mimicking.
-           # E.g., "CentOS 6.2", "Ubuntu 11.10", etc.
-           PLATFORM="$OPTARG"
-           DISTRO=`echo $PLATFORM | awk '{print $1}'`
-           VERSION=`echo $PLATFORM | awk '{print $2}'`
+            # This takes input basically of the form "OS VERSION" for the OS
+            # you're mimicking.
+            # E.g., "CentOS 6.2", "Ubuntu 11.10", etc.
+            PLATFORM="$OPTARG"
+            DISTRO=`echo $PLATFORM | awk '{print $1}'`
+            VERSION=`echo $PLATFORM | awk '{print $2}'`
 
-           echo "Script will masquerade as \"$PLATFORM\""
-           ;;
-        -) if [ "${OPTARG}" = "enable-flow-metrics" ]; then
-              ENABLE_FLOW_METRICS="flow_metrics"
-           elif [ "${OPTARG}" = "enable-server-metrics" ]; then
-              ENABLE_SERVER_METRICS="server_metrics"
-           elif [ "${OPTARG}" = "disable-metrics" ]; then
-              ENABLE_FLOW_METRICS=""
-              ENABLE_SERVER_METRICS=""
-              FEATURES=""
-           else
-              echo "Error: unrecognized option '--${OPTARG}'"
-              echo print_help
-           fi
-           ;;
+            echo "Script will masquerade as \"$PLATFORM\""
+            ;;
+        -)  case ${OPTARG} in
+                enable-flow-metrics)
+                    ENABLE_FLOW_METRICS="flow_metrics"
+                    ;;
+                enable-server-metrics)
+                    ENABLE_SERVER_METRICS="server_metrics"
+                    ;;
+                disable-metrics)
+                    ENABLE_FLOW_METRICS=""
+                    ENABLE_SERVER_METRICS=""
+                    FEATURES=""
+                    ;;
+                gd-relay-file)
+                    GDRELAYFILE="${!OPTIND}"
+                    shift
+                    if [ -z "${GDRELAYFILE}" ]; then
+                        echo "Error: missing config filename for --${OPTARG} arg."
+                        exit 1
+                    elif [ ! -f "${GDRELAYFILE}" ]; then
+                        echo "Error: could not find file '${GDRELAYFILE}'"
+                        exit 1
+                    fi
+                    ;;
+                *)
+                    echo "Error: unrecognized option '--${OPTARG}'"
+                    echo print_help
+                    ;;
+            esac
+            ;;
         [?]) print_help;;
     esac
 done
+
+update_api_creds
 
 if [ -n "${ENABLE_FLOW_METRICS}" -o -n "${ENABLE_SERVER_METRICS}" ]; then
     FEATURES=""
@@ -707,22 +758,3 @@ echo "The meter has been installed successfully!"
 
 exit 0
 
-===== DO NOT MODIFY THIS LINE OR BELOW =====
------BEGIN PGP PUBLIC KEY BLOCK-----
-Version: GnuPG v1.4.10 (GNU/Linux)
-
-mQENBE3WllEBCADlEuA7DCcI0B1/1rXJ4SzzQGXcHwmsxLVGnRR9FX4Fu3oCz4sc
-18/FkPHb2AwFfClv4xH6gOUBJVCDyub/C6PJeLolkc51SLA2lO3y5e3OpJ7uC8Ln
-/P5AC96FDhIEPH+vVnBVxgYRFj/1vDlqUcJXUSN3ZnLxzHwnHJ+lATNydbTi3ltL
-Kr53YOD5FmuKpc2hkNzT+9Lg1/aVEKXpnSjzlNT/1VIrXgJOzv/xyKvpSD2fb5M3
-QZMjEkrod5botvclt/y6P8LNWsmlG0eM+JiewnDzwJ3OnhekSzHqoh3kVKQ3YJed
-i1ZKInNthXQ5sSiHrsxHhJFGuVAQVA0/AmJfABEBAAG0G0JvdW5kYXJ5IDxvcHNA
-Ym91bmRhcnkuY29tPokBOAQTAQIAIgUCTdaWUQIbAwYLCQgHAwIGFQgCCQoLBBYC
-AwECHgECF4AACgkQQ4Go5GUyzCAqWggAjuJgzEYO1nTVd4hBhkhuxH1d/9R5eDzN
-SvxMk9gI2kKd71DsVP7PCVlPPIkzqL/IMv5ffO3me3R0S3bZzquhCOhrUc987GgZ
-+rPEcb0sDjT4fzcVeAOuaIf3T8oysx9ngB5pE4i3fatD43WvTGbj4LmU9XxiwZ6z
-AKzIYltGy/+Cq2JJjYgg80O2RmG8FFf8k/FujkbsNgNICQwWnAGKKlpJ4b65M5zu
-oNNUGFcJopGGufKLxXAiRwJqOx8a+EvD7/MEs5VYQJGeBgoaE6ZgXwufYJYn0Lv3
-6fxTtkLlIrD27gvTbV1oF8tj+T+7ayKj75YGnaH03QYBOG8tmbqV/A==
-=p4gi
------END PGP PUBLIC KEY BLOCK-----
