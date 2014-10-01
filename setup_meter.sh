@@ -689,8 +689,19 @@ fi
 if [ -n "$APICREDS_PRE" ]; then
     APITOKEN=`echo $APICREDS_PRE | awk -F: '{print $1}'`
     APIEMAIL=`echo $APICREDS_PRE | awk -F: '{print $2}'`
-    if [ -z "`echo ${APITOKEN} | sed -n '/api\.[0-9a-fA-F]\+-[0-9]\+$/p'`" -o \
-            -z "`echo ${APIEMAIL} | sed -n '/.\+@.\+\..\+/p'`" ]; then
+    CREDS_INVALID=""
+    if [ "${DISTRO}" = "FreeBSD" ]; then
+        if [ -z "`echo ${APITOKEN} | sed -r -n '/api\.[0-9a-fA-F]+-[0-9]+$/p'`" -o \
+                -z "`echo ${APIEMAIL} | sed -r -n '/.+@.+\..+/p'`" ]; then
+            CREDS_INVALID="yes"
+        fi
+    else
+        if [ -z "`echo ${APITOKEN} | sed -n '/api\.[0-9a-fA-F]\+-[0-9]\+$/p'`" -o \
+                -z "`echo ${APIEMAIL} | sed -n '/.\+@.\+\..\+/p'`" ]; then
+            CREDS_INVALID="yes"
+        fi
+    fi
+    if [ -n "${CREDS_INVALID}" ]; then
         echo "Please enter a valid Boundary Premium installation token"
         echo "Expected APITOKEN:APIEMAIL, got: '${APICREDS_PRE}'"
         echo
