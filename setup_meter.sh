@@ -359,7 +359,12 @@ EOF"
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
-        curl -s "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz" > boundary-meter-current.txz
+        # Use the way which works for https per OS ver.
+        if [ -n "$(echo ${VERSION} | sed -n '/^1[0-9]\./p')" ]; then
+            curl -s "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz" > boundary-meter-current.txz
+        else
+            fetch "https://${FREEBSD}/`echo ${VERSION} | awk -F '-' '{print $1}'`/${MACHINE}/boundary-meter-current.txz"
+        fi
         pkg add boundary-meter-current.txz
 
     elif [ "$DISTRO" = "Gentoo" ]; then
