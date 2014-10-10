@@ -256,8 +256,8 @@ function print_help() {
     echo "          the following:"
     echo
     echo "              - Boundary Premium"
-    echo "                  The API token is api.XXXXXXXXXX-XXXX:<email address>, which can be found in"
-    echo "                  'Settings->Account' as 'Your API token' and 'Owner' in the Boundary Premium WebUI."
+    echo "                  The API token is api.XXXXXXXXXX-XXXX, which can be found in"
+    echo "                  'Settings->Account' as 'Your API token'."
     echo "              - Boundary Enterprise"
     echo "                  The API token is ORGID:APIKEY, which can be found in"
     echo "                  Account Settings in the Boundary Enterprise WebUI."
@@ -692,23 +692,19 @@ if [ -n "$APICREDS_ENT" ]; then
 fi
 
 if [ -n "$APICREDS_PRE" ]; then
-    APITOKEN=`echo $APICREDS_PRE | awk -F: '{print $1}'`
-    APIEMAIL=`echo $APICREDS_PRE | awk -F: '{print $2}'`
     CREDS_INVALID=""
     if [ "${DISTRO}" = "FreeBSD" ]; then
-        if [ -z "`echo ${APITOKEN} | sed -r -n '/api\.[0-9a-fA-F]+-[0-9]+$/p'`" -o \
-                -z "`echo ${APIEMAIL} | sed -r -n '/.+@.+\..+/p'`" ]; then
+        if [ -z "`echo ${APICREDS_PRE} | sed -r -n '/api\.[0-9a-fA-F]+-[0-9]+$/p'`" ]; then
             CREDS_INVALID="yes"
         fi
     else
-        if [ -z "`echo ${APITOKEN} | sed -n '/api\.[0-9a-fA-F]\+-[0-9]\+$/p'`" -o \
-                -z "`echo ${APIEMAIL} | sed -n '/.\+@.\+\..\+/p'`" ]; then
+        if [ -z "`echo ${APICREDS_PRE} | sed -n '/api\.[0-9a-fA-F]\+-[0-9]\+$/p'`" ]; then
             CREDS_INVALID="yes"
         fi
     fi
     if [ -n "${CREDS_INVALID}" ]; then
         echo "Please enter a valid Boundary Premium installation token"
-        echo "Expected APITOKEN:APIEMAIL, got: '${APICREDS_PRE}'"
+        echo "Expected APITOKEN, got: '${APICREDS_PRE}'"
         echo
 
         print_help
