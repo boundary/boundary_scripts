@@ -348,14 +348,6 @@ EOF"
     elif [ "$DISTRO" = "SmartOS" ]; then
       SMARTOS_PKG=$(curl -s http://${SMARTOS}/${MACHINE}/ | sed -n 's/^.*\"\(boundary-meter.*tgz\)\".*$/\1/p' | tail -n 1)
       pkg_add -f -v http://${SMARTOS}/${MACHINE}/${SMARTOS_PKG}
-      # Enable promiscuous mode on SmartOS by default.
-      # Non-promiscuous mode is not very useful because the OS only forwards
-      # received traffic.
-      if [ -f /opt/local/etc/boundary/meter.defaults ]; then
-          sed -i -e 's/PCAP_PROMISC=0/PCAP_PROMISC=1/' /opt/local/etc/boundary/meter.defaults
-      fi
-      svccfg import /opt/custom/smf/boundary-meter.xml
-      svcadm enable boundary/meter
       return $?
 
     elif [ "$DISTRO" = "FreeBSD" ]; then
