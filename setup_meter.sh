@@ -249,27 +249,30 @@ function check_distro_version() {
 }
 
 function print_help() {
-    echo "${SCRIPTNAME} [-s] -i <API token>[,<API token>] [--enable-flow-metrics] [--enable-server-metrics]"
+    echo "${SCRIPTNAME} [-s] -i <API token>[,<API token>] \\"
     i=0; while [ ${i} -le ${#SCRIPTNAME} ]; do echo -n " "; i=$((i + 1)); done
-    echo "[--gd-relay-file <config filename>]"
+    echo "[--enable-flow-metrics] [--enable-server-metrics] \\"
+    i=0; while [ ${i} -le ${#SCRIPTNAME} ]; do echo -n " "; i=$((i + 1)); done
+    echo "[--gd-relay-file <file>]"
     echo
-    echo "      -i: Required input for authentication. The API token can be one (or both) of"
-    echo "          the following:"
+    echo " Basic options:"
+    echo "   -i: Required input for authentication. The API token can be one (or both) of"
+    echo "       the following:"
     echo
-    echo "              - Boundary Premium"
-    echo "                  The API token is api.XXXXXXXXXX-XXXX, which can be found in"
-    echo "                  'Settings->Account' as 'Your API token'."
-    echo "              - Boundary Enterprise"
-    echo "                  The API token is ORGID:APIKEY, which can be found in"
-    echo "                  Account Settings in the Boundary Enterprise WebUI."
+    echo "         - Boundary Premium"
+    echo "            The API token is api.XXXXXXXXXX-XXXX, which can be found in"
+    echo "            'Settings->Account' as 'Your API token'."
+    echo "         - Boundary Enterprise"
+    echo "            The API token is ORGID:APIKEY, which can be found in"
+    echo "            Account Settings in the Boundary Enterprise WebUI."
     echo
-    echo "      -s: Install the latest testing meter from the staging repositories"
+    echo "   -s: Install the latest testing meter from the staging repositories"
     echo
-    echo "      --enable-flow-metrics: Enable the reporting of network flow metrics (default)"
-    echo "      --enable-server-metrics: Enable the reporting of host level metrics"
-    echo "      --disable-metrics: Disable reporting of all metrics"
-    echo
-    echo "      --gd-relay-file <config filename>: Import GD relay settings from existing relay 'config.json' config file"
+    echo " Advanced options:"
+    echo "   --enable-flow-metrics:   Enable reporting network flow metrics (default)"
+    echo "   --enable-server-metrics: Enable reporting host level metrics"
+    echo "   --disable-metrics:       Disable reporting of all metrics"
+    echo "   --gd-relay-file <file>:  Import relay settings file (e.g. config.json)"
     exit 0
 }
 
