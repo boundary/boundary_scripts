@@ -461,7 +461,7 @@ if [ -f /etc/redhat-release ] ; then
            elif [ "$DISTRO" = "Scientific" ]; then
                 VERSION=`echo $PLATFORM | awk '{print $4}'`
            elif [ "$DISTRO" = "SHMZ" ]; then
-                VERSION=`echo $PLATFORM | awk '{print $4}'`
+                VERSION=`echo $PLATFORM | awk '{print $3}'`
            else
                 DISTRO="unknown"
                 PLATFORM="unknown"
