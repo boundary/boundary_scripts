@@ -67,7 +67,7 @@ APICREDS=
 APIHOST_ENT="api.boundary.com"
 APICREDS_ENT=
 # API 'premium' host and cred/token
-APIHOST_PRE="api.graphdat.com"
+APIHOST_PRE="premium-api.boundary.com"
 APICREDS_PRE=
 
 METERTAGS=
@@ -164,7 +164,7 @@ function ec2_find_tags() {
         return 0
     fi
 
-    METERTAGS=ec2
+    EC2METERTAGS=ec2
 
     for tag in $EC2_TAGS; do
         local AN_TAG
@@ -192,17 +192,23 @@ function ec2_find_tags() {
         fi
 
         for an_tag in $AN_TAG; do
-            METERTAGS=$METERTAGS,$an_tag
+            EC2METERTAGS=$EC2METERTAGS,$an_tag
         done
     done
 
     # extract additional tags if the commands and access variables are set
     if [ -n "$EC2_DESC_TAGS" -a -n "$EC2_ACCESS_KEY" -a -n "$EC2_SECRET_KEY" -a -n "$EC2_URL" ]; then
         for an_tag in `${EC2_DESC_TAGS} --filter "resource-id=\`curl -s http://169.254.169.254/latest/meta-data/instance-id\`" | grep -v Name | sed 's/[ \t]/ /g' | cut -d " " -f 5-`; do
-            METERTAGS=$METERTAGS,$an_tag
+            EC2METERTAGS=$EC2METERTAGS,$an_tag
         done
     fi
-    echo Discovered ec2 tags: $METERTAGS
+
+    echo Discovered ec2 tags: $EC2METERTAGS
+    if [ -n "${METERTAGS}" ]; then
+        METERTAGS=$METERTAGS,$EC2METERTAGS
+    else
+        METERTAGS=$EC2METERTAGS
+    fi
 }
 
 function check_distro_version() {
@@ -267,6 +273,7 @@ function print_help() {
     echo "            Account Settings in the Boundary Enterprise WebUI."
     echo
     echo "   -s: Install the latest testing meter from the staging repositories"
+    echo "   -t: comma-separated list of tags to assign this meter"
     echo
     echo " Advanced options:"
     echo "   --enable-flow-metrics:   Enable reporting network flow metrics (default)"
@@ -540,11 +547,12 @@ fi
 ENABLE_FLOW_METRICS=""
 ENABLE_SERVER_METRICS=""
 GDRELAYFILE=""
-while getopts "hdsi:f:-:" opts; do
+while getopts "hdsi:t:f:-:" opts; do
     case $opts in
         h)  print_help;;
         s)  STAGING="true";;
         i)  APICREDS="$OPTARG";;
+        t)  METERTAGS="$OPTARG";;
         f)  echo "WARNING! You are OVERRIDING this script's OS detection."
             echo "On unsupported platforms, your mileage may vary!"
             print_supported_platforms
