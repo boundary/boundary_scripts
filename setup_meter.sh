@@ -414,7 +414,7 @@ function pre_install_sanity() {
     if [ $DISTRO = "SmartOS" ]; then
         CURL="`which curl` -k"
     else
-        CURL="`which curl` --sslv3"
+        CURL="`which curl`"
     fi
 
     if [ $DISTRO = "Ubuntu" ] || [ $DISTRO = "Debian" ]; then
