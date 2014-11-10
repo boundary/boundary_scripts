@@ -17,7 +17,7 @@ set -o pipefail
 ### limitations under the License.
 ###
 
-PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle" "Scientific" "SHMZ")
+PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "FreeBSD" "LinuxMint" "Gentoo" "Oracle" "Scientific" "SHMZ" "OSX")
 
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
@@ -35,6 +35,7 @@ Gentoo_VERSIONS=("1.12.11.1")
 Oracle_VERSIONS=("5" "6" "7")
 Scientific_VERSIONS=("6" "7")
 SHMZ_VERSIONS=("5" "6")
+OSX_VERSIONS=("12.0.0" "13.0.0" "14.0.0")
 
 # sed strips out obvious things in a version number that can't be used as
 # a bash variable
@@ -80,6 +81,7 @@ YUM="yum.boundary.com"
 SMARTOS="smartos.boundary.com"
 FREEBSD="freebsd.boundary.com"
 GENTOO="gentoo.boundary.com"
+OSX="mac.boundary.com"
 
 APT_CMD="apt-get -q -y --force-yes"
 YUM_CMD="yum -d0 -e0 -y"
@@ -386,6 +388,12 @@ EOF"
          wget "http://${GENTOO}/engineyard/`cat latest`")
         ebuild --skip-manifest boundary-meter/`cat boundary-meter/latest` merge
         rm -fr boundary-meter
+    elif [ "$DISTRO" = "OSX" ]; then
+        curl https://$OSX/boundary-meter-current-osx-x86_64.tar.gz > boundary-meter.tar.gz
+        tar xvf boundary-meter.tar.gz
+        cd boundary-meter-*
+        ./start.sh -i ${APICREDS}
+		echo "To start the meter again, run './start.sh' in the `boundary-meter-*` directory"
     fi
 }
 
@@ -536,7 +544,7 @@ else
             uname -sv | grep 'Darwin' > /dev/null
             if [ "$?" = "0" ]; then
                 PLATFORM="Darwin"
-                DISTRO="OS X"
+                DISTRO="OSX"
                 VERSION=`uname -r`
                 MACHINE=`uname -m`
             fi
@@ -619,6 +627,7 @@ if [ $STAGING = "true" ]; then
     SMARTOS="smartos-staging.boundary.com"
     FREEBSD="freebsd-staging.boundary.com"
     GENTOO="gentoo-staging.boundary.com"
+    OSX="mac-staging.boundary.com"
 fi
 
 if [ "$MACHINE" = "i686" ] ||
@@ -699,8 +708,8 @@ fi
 
 if [ -n "$APICREDS_PRE" ]; then
     CREDS_INVALID=""
-    if [ "${DISTRO}" = "FreeBSD" ]; then
-        if [ -z "`echo ${APICREDS_PRE} | sed -r -n '/api\.[0-9a-fA-F]+-[0-9]+$/p'`" ]; then
+    if [ "${DISTRO}" = "FreeBSD" -o "${DISTRO}" = "OSX" ]; then
+        if [ -z "`echo ${APICREDS_PRE} | sed -E -n '/api\.[0-9a-fA-F]+-[0-9]+$/p'`" ]; then
             CREDS_INVALID="yes"
         fi
     else
@@ -718,7 +727,7 @@ if [ -n "$APICREDS_PRE" ]; then
 fi
 
 # If this script is being run by root for some reason, don't use sudo.
-if [ "$(id -u)" != "0" ]; then
+if [ ${DISTRO} != "OSX" -a "$(id -u)" != "0" ]; then
     SUDO=`which sudo`
     if [ $? -ne 0 ]; then
         echo "This script must be executed as the 'root' user or with sudo"
