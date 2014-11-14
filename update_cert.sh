@@ -38,9 +38,9 @@ function Usage() {
 function MeterInstalled() {
   if [ -d /etc/bprobe -o -d /etc/boundary ]
   then
-    return 1
+    return 0
   else
-   return 0
+    return 1
   fi
 }
 
@@ -90,11 +90,17 @@ function ExecAvailable() {
 ##  None
 ##
 function CheckPrerequisites() {
+  local result=0
 
   for exec in curl openssl
   do
     ExecAvailable $exec
+    if [ $? -ne 0 ]
+    then
+      result=1
+    fi
   done
+  return "$result"
 }
 
 ##
@@ -127,23 +133,25 @@ function StartMeter() {
 function Initialize() {
 
   # Check to see if meter is installed and if print error message and exit.
-  if [ MeterInstalled -eq 0 ]
+  MeterInstalled
+  if [ $? -eq 1 ]
   then
     echo "Meter is not installed" 2>&1
     exit 1
   fi
 
   # If we do not have the api key then print usage and exit
-  if [ $# -lt 1 ]
+  if [ $# -ne 1 ]
   then
     Usage
   else
     # Make API_KEY read-only
-    typeset -r API_KEY="$1"
+    API_KEY="$1"
   fi
 
   # Check for dependent commands or other software to run this script
-  if [ CheckPrerequisites -eq 0 ]
+  CheckPrerequisites
+  if [ $? -ne 0 ]
   then
     exit 1
   fi
@@ -154,12 +162,10 @@ function Initialize() {
   case "$meter_version" in
     2)
       METER_ETC=/etc/bprobe
-      CERT_FILE=$METER_ETC/cert.pem
       METER_INITD=/etc/init.d/bprobe
     ;;
     3)
       METER_ETC=/etc/boundary
-      CERT_FILE=$METER_ETC/ca.pem
       METER_INITD=/etc/init.d/boundary-meter
     ;;
     *)
@@ -200,7 +206,7 @@ function CertificateSubject() {
 ##
 function CertificateOrgId() {
   local -r cert_file=$1
-  local org_id=$(echo "$(CertificateSubject)" | cut -d'/' -f1 | cut -d'=' -f2)
+  local org_id=$(echo "$(CertificateSubject $cert_file)" | cut -d'/' -f1 | cut -d'=' -f2)
   echo "$org_id"
 }
 
@@ -225,50 +231,51 @@ function CertificateMeterId() {
 ##  $3 - Meter Id
 ##
 
-function MeterCertficateDelete() {
+function MeterCertificateDelete() {
   local -r api_key=$1
   local -r org_id=$2
   local -r meter_id=$3
 
-   curl -f -u "$api_key:" -X DELETE https://$BOUNDARY_API_HOST/$org_id/meters/$meter_id/cert.pem
+   curl -s -f -u "$api_key:" -X DELETE https://$BOUNDARY_API_HOST/$org_id/meters/$meter_id/cert.pem
 }
 
-#
-# Update the version 1 certs on the meter host
-#
-# ARGS
-#   $1 - Path to the certificate file
-#
+##
+## Update the version 1 certs on the meter host
+##
+## ARGS
+##   $1 - Path to the certificate file
+##
 function UpdateCerts() {
   local -r api_key=$1
-  local -r cert_file=$2
-  local certdir=$(dirname "$cert_file")
+  local -r cert_dir=$2
+  local -r cert_file="$cert_dir/cert.pem"
   local cert_version=$(CertificateVersion "$cert_file")
 
   case "$cert_version" in
-    1)
+    3)
       echo "Certificate $cert_file is invalid: $cert_version"
 
       ORG_ID=$(CertificateOrgId "$cert_file")
       METER_ID=$(CertificateMeterId "$cert_file")
-      echo "Organization ID: $ORG_ID, Meter ID: $METER_ID"
+      echo "Organization ID: $ORG_ID"
+      echo "Meter ID: $METER_ID"
 
       # Stop the meter so we can update the certificates
       StopMeter
 
       MeterCertificateDelete "$API_KEY" "$ORG_ID" "$METER_ID"
 
-      cp -p $certdir/cert.pem $certdir/cert.pem.old
-      curl -f -u "$API_KEY:" -o $certdir/cert.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/cert.pem
+      cp -p $cert_dir/cert.pem $cert_dir/cert.pem.old
+      curl -s -f -u "$API_KEY:" -o $cert_dir/cert.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/cert.pem
 
-      cp -p $certdir/key.pem $certdir/key.pem.old
-      curl -f -u "$API_KEY:" -o $certdir/key.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/key.pem
+      cp -p $cert_dir/key.pem $certdir/key.pem.old
+      curl -s -f -u "$API_KEY:" -o $cert_dir/key.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/key.pem
 
       # Start the meter with the new certificates
       StartMeter
 
       ;;
-    3)
+    1)
       echo "Certificate $cert_file is OK: $cert_version"
       ;;
     *)
@@ -287,10 +294,10 @@ function Main() {
 
    Initialize $*
 
-   UpdateCerts "$API_KEY"
+   UpdateCerts "$API_KEY" "$METER_ETC"
 }
 
 #
 # Execute the script
 #
-#Main $*
+Main $*
