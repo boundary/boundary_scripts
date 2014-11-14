@@ -53,12 +53,12 @@ function MeterInstalled() {
 function MeterVersion() {
    local -i version=0
 
-   if [ -d /etc/bprobe ] 
-   then
-      version=2
-   elif [ -d /etc/boundary ]
+   if [ -d /etc/boundary ] 
    then
       version=3
+   elif [ -d /etc/bprobe ]
+   then
+      version=2
    fi
    echo $version
 }
