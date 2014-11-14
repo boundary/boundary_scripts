@@ -170,6 +170,7 @@ function Initialize() {
     ;;
     *)
       echo "Unknown meter version exiting"
+      exit 1
     ;;
   esac
 }
