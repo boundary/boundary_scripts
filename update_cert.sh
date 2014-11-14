@@ -252,7 +252,7 @@ function UpdateCerts() {
   local cert_version=$(CertificateVersion "$cert_file")
 
   case "$cert_version" in
-    3)
+    1)
       echo "Certificate $cert_file is invalid: $cert_version"
 
       ORG_ID=$(CertificateOrgId "$cert_file")
@@ -275,7 +275,7 @@ function UpdateCerts() {
       StartMeter
 
       ;;
-    1)
+    3)
       echo "Certificate $cert_file is OK: $cert_version"
       ;;
     *)
