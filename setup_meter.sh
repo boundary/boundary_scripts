@@ -22,7 +22,7 @@ PLATFORMS=("Ubuntu" "Debian" "CentOS" "Amazon" "RHEL" "SmartOS" "openSUSE" "Free
 # Put additional version numbers here.
 # These variables take the form ${platform}_VERSIONS, where $platform matches
 # the tags in $PLATFORMS
-Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10" "14.04")
+Ubuntu_VERSIONS=("10.04" "10.10" "11.04" "11.10" "12.04" "12.10" "13.04" "13.10" "14.04" "14.10" "15.04")
 Debian_VERSIONS=("5" "6" "7")
 CentOS_VERSIONS=("5" "6" "7")
 Amazon_VERSIONS=("2012.09" "2013.03")
@@ -52,6 +52,8 @@ map Ubuntu 12.10 quantal
 map Ubuntu 13.04 raring
 map Ubuntu 13.10 saucy
 map Ubuntu 14.04 trusty
+map Ubuntu 14.10 utopic
+map Ubuntu 15.04 vivid
 map Debian 5 lenny
 map Debian 6 squeeze
 map Debian 7 wheezy
@@ -252,7 +254,7 @@ function check_distro_version() {
         fi
     done
 
-    echo "Detected $DISTRO but with an untested version ($VERSION)"
+    echo "$DISTRO $VERSION is not officially supported yet"
     return 1
 }
 
@@ -298,7 +300,7 @@ function do_install() {
         if [ "$DISTRO" = "Debian" ]; then
             APT_STRING="deb https://${APT}/debian/ `get $DISTRO $MAJOR_VERSION` main"
         fi
-        echo "Adding repository $APT_STRING"
+        echo -n "Adding repository $APT_STRING..."
         sh -c "echo \"$APT_STRING\" > /etc/apt/sources.list.d/boundary.list"
 
         print_pgp_key | apt-key add -
@@ -630,6 +632,22 @@ if [ $STAGING = "true" ]; then
     OSX="mac-staging.boundary.com"
 fi
 
+# If this script is being run by root for some reason, don't use sudo.
+if [ ${DISTRO} != "OSX" -a "$(id -u)" != "0" ]; then
+    SUDO=`which sudo`
+    if [ $? -ne 0 ]; then
+        echo "This script must be executed as the 'root' user or with sudo"
+        echo "in order to install the Boundary meter."
+        echo
+        echo "Please install sudo or run again as the 'root' user."
+        echo "For assistance, support@boundary.com"
+        exit 1
+    else
+        sudo -E $0 $@
+        exit 0
+    fi
+fi
+
 if [ "$MACHINE" = "i686" ] ||
    [ "$MACHINE" = "i586" ] ||
    [ "$MACHINE" = "i386" ] ; then
@@ -648,13 +666,13 @@ if [[ "$MACHINE" == arm* ]] ; then
                [ "$MACHINE" = "armv5tejl" ] ; then
                 ARCH="32"
                 SUPPORTED_ARCH=1
-                echo "Detected $MACHINE running armel"
+                echo "Detected $MACHINE running armel..."
             fi
         else
             if [ "$MACHINE" = "armv7l" ] ; then
                 ARCH="32"
                 SUPPORTED_ARCH=1
-                echo "Detected $MACHINE running armhf"
+                echo "Detected $MACHINE running armhf..."
             else
                 echo "$MACHINE with armhf ABI is not supported. Try the armel ABI"
             fi
@@ -726,22 +744,6 @@ if [ -n "$APICREDS_PRE" ]; then
     fi
 fi
 
-# If this script is being run by root for some reason, don't use sudo.
-if [ ${DISTRO} != "OSX" -a "$(id -u)" != "0" ]; then
-    SUDO=`which sudo`
-    if [ $? -ne 0 ]; then
-        echo "This script must be executed as the 'root' user or with sudo"
-        echo "in order to install the Boundary meter."
-        echo
-        echo "Please install sudo or run again as the 'root' user."
-        echo "For assistance, support@boundary.com"
-        exit 1
-    else
-        sudo -E $0 $@
-        exit 0
-    fi
-fi
-
 echo "Detected $DISTRO $VERSION..."
 
 # Check the version number
@@ -749,7 +751,6 @@ UNSUPPORTED_RELEASE=0
 check_distro_version "$PLATFORM" $DISTRO $VERSION
 if [ $? -ne 0 ]; then
     UNSUPPORTED_RELEASE=1
-    echo "Detected $PLATFORM $DISTRO $VERSION"
 fi
 
 # The version number hasn't been found; let's just try and masquerade
@@ -761,10 +762,7 @@ if [ $UNSUPPORTED_RELEASE -eq 1 ] ; then
     VERSION=`echo $VERSIONS | awk '{print $NF}'`
     MAJOR_VERSION=`echo $VERSION | awk -F. '{print $1}'`
     MINOR_VERSION=`echo $VERSION | awk -F. '{print $2}'`
-
-    echo ""
     echo "Continuing; for reference, script is masquerading as: $DISTRO $VERSION"
-    echo ""
 fi
 
 # At this point, we think we have a supported OS.
