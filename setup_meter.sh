@@ -67,10 +67,10 @@ map RHEL 7 Maipo
 SCRIPTNAME="$(basename ${0})"
 APICREDS=
 # API 'enterprise' host and cred/token
-APIHOST_ENT="api.boundary.com"
+APIHOST_ENT=${APIHOST_ENT:-"https://api.boundary.com"}
 APICREDS_ENT=
 # API 'premium' host and cred/token
-APIHOST_PRE="premium-api.boundary.com"
+APIHOST_PRE=${APIHOST_PRE:-"https://premium-api.boundary.com"}
 APICREDS_PRE=
 
 METERTAGS=
@@ -291,6 +291,8 @@ function do_install() {
     # export 'enterprise' and 'premium' tokens to the environment...
     export INSTALLTOKEN="${APICREDS}"
     export INSTALLTOKENS="${APICREDS}"
+    export PROVISIONPREMIUMAPIHOST="${APIHOST_PRE}"
+    export PROVISIONENTERPRISEAPIHOST="${APIHOST_ENT}"
     export PROVISIONTAGS="${METERTAGS}"
     export PROVISIONFEATURES="${FEATURES}"
     export PROVISIONDEFEATURES="${DEFEATURES}"
@@ -394,7 +396,7 @@ EOF"
         curl https://$OSX/boundary-meter-current-osx-x86_64.tar.gz > boundary-meter.tar.gz
         tar xvf boundary-meter.tar.gz
         cd boundary-meter-*
-        ./start.sh -i ${APICREDS}
+        ./start.sh -i ${APICREDS} -a ${APIHOST_PRE}
 		echo "To start the meter again, run './start.sh' in the `boundary-meter-*` directory"
     fi
 }
