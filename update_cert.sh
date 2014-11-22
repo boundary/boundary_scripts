@@ -237,7 +237,7 @@ function MeterCertificateDelete() {
   local -r org_id=$2
   local -r meter_id=$3
 
-   curl -s -f -u "$api_key:" -X DELETE https://$BOUNDARY_API_HOST/$org_id/meters/$meter_id/cert.pem
+   curl --tlsv1 -i -f -u "$api_key:" -X DELETE https://$BOUNDARY_API_HOST/$org_id/meters/$meter_id/cert.pem
 }
 
 ##
@@ -251,36 +251,39 @@ function UpdateCerts() {
   local -r cert_dir=$2
   local -r cert_file="$cert_dir/cert.pem"
   local cert_version=$(CertificateVersion "$cert_file")
+  local -r ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   case "$cert_version" in
     1)
-      echo "Certificate $cert_file is invalid: $cert_version"
+      echo "Found v1 certificte in $cert_file"
+      echo "Updating..."
 
       ORG_ID=$(CertificateOrgId "$cert_file")
       METER_ID=$(CertificateMeterId "$cert_file")
-      echo "Organization ID: $ORG_ID"
-      echo "Meter ID: $METER_ID"
 
       # Stop the meter so we can update the certificates
       StopMeter
 
       MeterCertificateDelete "$API_KEY" "$ORG_ID" "$METER_ID"
 
-      cp -p $cert_dir/cert.pem $cert_dir/cert.pem.old
-      curl -s -f -u "$API_KEY:" -o $cert_dir/cert.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/cert.pem
+      cp -p "$cert_dir/cert.pem" "$cert_dir/cert.pem.$ts"
+      curl --tlsv1 -i -f -u "$API_KEY:" -o $cert_dir/cert.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/cert.pem
 
-      cp -p $cert_dir/key.pem $certdir/key.pem.old
-      curl -s -f -u "$API_KEY:" -o $cert_dir/key.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/key.pem
+      cp -p "$cert_dir/key.pem $certdir/key.pem.$ts"
+      curl --tlsv1 -i -f -u "$API_KEY:" -o $cert_dir/key.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/key.pem
 
       # Start the meter with the new certificates
       StartMeter
 
+      echo "done"
+
       ;;
     3)
-      echo "Certificate $cert_file is OK: $cert_version"
+      echo "Found v3 certificate in $cert_file"
+      echo "No update required...done"
       ;;
     *)
-      echo "Certificate $cert_file has unknown cert version: $cert_version" >&2
+      echo "Found unknown certificate version in $cert_file...exiting"
       exit 1
   esac
 }
