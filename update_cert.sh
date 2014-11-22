@@ -255,7 +255,7 @@ function UpdateCerts() {
 
   case "$cert_version" in
     1)
-      echo "Found v1 certificte in $cert_file"
+      echo "Found v1 certificate in $cert_file"
       echo "Updating..."
 
       ORG_ID=$(CertificateOrgId "$cert_file")
@@ -269,7 +269,7 @@ function UpdateCerts() {
       cp -p "$cert_dir/cert.pem" "$cert_dir/cert.pem.$ts"
       curl --tlsv1 -i -f -u "$API_KEY:" -o $cert_dir/cert.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/cert.pem
 
-      cp -p "$cert_dir/key.pem $certdir/key.pem.$ts"
+      cp -p "$cert_dir/key.pem" "$certdir/key.pem.$ts"
       curl --tlsv1 -i -f -u "$API_KEY:" -o $cert_dir/key.pem https://$BOUNDARY_API_HOST/$ORG_ID/meters/$METER_ID/key.pem
 
       # Start the meter with the new certificates
