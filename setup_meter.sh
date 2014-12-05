@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# $Id$
+
 set -o pipefail
 
 ##
